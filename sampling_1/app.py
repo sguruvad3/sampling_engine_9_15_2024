@@ -2,7 +2,8 @@ import asyncio
 import boto3
 from botocore.exceptions import ClientError
 import datetime as datetime_object
-from datetime import time
+from datetime import date, datetime, timedelta, timezone
+from datetime import time as dt_time
 from datetime import datetime as datetime_parser
 from cassandra import ConsistencyLevel
 from cassandra.auth import PlainTextAuthProvider
@@ -32,7 +33,7 @@ def format_time(input_time:str) -> str:
     timezone_info = timestamp_obj.tzinfo
 
     #parse time zone
-    time_object = time(tzinfo=timezone_info)
+    time_object = dt_time(tzinfo=timezone_info)
     timezone_offset = time_object.utcoffset().seconds//3600
     timezone_offset = str(timezone_offset).zfill(4)
     output_time = f'{year}-{month}-{day} {hours}:{minutes}:{seconds}.{milliseconds}+{timezone_offset }'
@@ -184,12 +185,14 @@ class sampling_engine():
         query_start_time_string = format_time(query_start_time)
         query_end_time_string = format_time(query_end_time)
 
-        {self.timestamp_column_name}
-
         sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} USING TIMESTAMP WHERE {self.timestamp_column_name}>='{query_start_time_string} AND {self.timestamp_column_name}<='{query_end_time_string}';", fetch_size=self.fetch_size)
         try:
-            self.aws_keyspaces_session.execute(sql_statement)
+            records = self.aws_keyspaces_session.execute(sql_statement)
+            print('query success')
+            for record in records[0:2]:
+                print(record.mmsi)
         except:
+            print('query fail')
             pass
         return
 
@@ -218,11 +221,10 @@ class sampling_engine():
         return
 
 if __name__ == "__main__":
-    engine_object = samling_engine()
+    engine_object = sampling_engine()
     engine_object.get_keyspace_credentials()
     engine_object.setup_keyspace_connection()
-    engine_object.create_table()
-    asyncio.run(engine_object.insert_records())
+    engine_object.select_records()
 
 
 
