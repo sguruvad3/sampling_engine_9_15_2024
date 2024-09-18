@@ -14,7 +14,6 @@ import logging
 import os
 import pandas as pd
 from ssl import SSLContext, PROTOCOL_TLSv1_2 , CERT_REQUIRED
-import websockets
 
 def format_time(input_time:str) -> str:
     '''
@@ -40,18 +39,13 @@ def format_time(input_time:str) -> str:
     
     return output_time
 
-class ingest_engine():
+class sampling_engine():
     def __init__(self):
-        self.ais_socket_configuration_path = 'config/ais_socket_configuration.csv'
         self.aws_user_credentials_path = 'config/ingest-engine-user-1_accessKeys.csv'
         self.iam_role_credentials_path = 'config/cassandra_iam_role_credentials.csv'
         self.keyspace_endpoint_path = 'config/keyspace_configuration.csv'
         self.cassandra_security_certificate_path = 'config/sf-class2-root.crt'
         
-        self.ais_web_socket_api_key = None
-        self.ais_web_socket_url = None
-
-        self.ais_socket_configuration_dataframe = None
         self.aws_user_credentials_dataframe = None
         self.iam_role_credentials_dataframe = None
         self.keyspace_endpoint_dataframe = None
@@ -98,15 +92,6 @@ class ingest_engine():
 
         logging.basicConfig(filename="test.log", format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M", level=logging.INFO)
 
-        return
-
-    def load_ais_web_socket_configuration(self):
-        '''
-        Loads configuration parameters for connection to AIS data web socket
-        '''
-        self.ais_socket_configuration_dataframe = pd.read_csv(self.ais_socket_configuration_path)
-        self.ais_web_socket_api_key = self.ais_socket_configuration_dataframe['APIKey'][0]
-        self.ais_web_socket_url = self.ais_socket_configuration_dataframe['url'][0]
         return
 
     def load_aws_user_credentials(self):
@@ -172,22 +157,6 @@ class ingest_engine():
         self.aws_keyspaces_session = self.cluster_object.connect()
         return
 
-    def create_table(self):
-        '''
-        Creates table in keyspace
-        '''
-        sql_statement = f'CREATE TABLE IF NOT EXISTS {self.keyspace_name}.{self.keyspace_table} ({self.id_column_name} {self.id_column_type} PRIMARY KEY, {self.latitude_column_name} {self.latitude_column_type}, {self.longitude_column_name} {self.longitude_column_type}, {self.mmsi_column_name} {self.mmsi_column_type}, {self.timestamp_column_name} {self.timestamp_column_type});'
-        self.aws_keyspaces_session.execute(sql_statement)
-        return
-
-    def drop_table(self):
-        '''
-        Drops table in keyspace
-        '''
-        sql_statement = f'DROP TABLE IF EXISTS {self.keyspace_name}.{self.keyspace_table}'
-        self.aws_keyspaces_session.execute(sql_statement)
-        return
-
     def select_all(self):
         '''
         select all records from keyspace cluster
@@ -198,37 +167,31 @@ class ingest_engine():
             print(record.id, record.lat, record.lon, record.mmsi, record.time)
         return
 
-    async def insert_records(self):
+    def select_records(self):
         '''
-        Asynchronously insert records to keyspace
+        Selects records from specified start and end time
         '''
-        self.load_ais_web_socket_configuration()
-        async with websockets.connect(self.ais_web_socket_url) as websocket:
-            subscribe_message = {"APIKey": self.ais_web_socket_api_key, "BoundingBoxes": [[[-11, 178], [30, 74]]]}
+        utc_time_delta = timedelta(hours=0)
+        utc_timezone_object = timezone(utc_time_delta)
+        
+        current_date = date.today()
+        start_date = current_date - timedelta(days=1)
+        query_start_time = datetime(year=start_date.year, month=start_date.month, day=start_date.day, hour=0, minute=0, second=0, tzinfo=utc_timezone_object)
 
-            subscribe_message_json = json.dumps(subscribe_message)
-            await websocket.send(subscribe_message_json)
+        query_end_time = datetime(year=start_date.year, month=start_date.month, day=start_date.day, hour=23, minute=59, second=59, tzinfo=utc_timezone_object)
 
-            async for message_json in websocket:
+        query_start_time_string = format_time(query_start_time)
+        query_end_time_string = format_time(query_end_time)
 
-                message = json.loads(message_json)
+        {self.timestamp_column_name}
 
-                latitude = message['MetaData']['latitude']
-                longitude = message['MetaData']['longitude']
-                timestamp = message['MetaData']['time_utc']
-                mmsi = message['MetaData']['MMSI']
+        sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} USING TIMESTAMP WHERE {self.timestamp_column_name}>='{query_start_time_string} AND {self.timestamp_column_name}<='{query_end_time_string}';")
+        try:
+            self.aws_keyspaces_session.execute(sql_statement)
+        except:
+            pass
+        return
 
-                #cast data types for insertion
-                latitude = float(latitude)
-                longitude = float(longitude)
-                mmsi = str(mmsi)
-                timestamp = format_time(timestamp)
-                
-                sql_statement = SimpleStatement(f"INSERT INTO {self.keyspace_name}.{self.keyspace_table} ({self.id_column_name}, {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name}) VALUES(uuid(), {latitude}, {longitude}, '{mmsi}', '{timestamp}');", consistency_level=ConsistencyLevel.LOCAL_QUORUM)
-                try:
-                    self.aws_keyspaces_session.execute(sql_statement)
-                except:
-                    pass
 
     def clear_aws_user_credentials(self):
         '''
@@ -254,7 +217,7 @@ class ingest_engine():
         return
 
 if __name__ == "__main__":
-    engine_object = ingest_engine()
+    engine_object = samling_engine()
     engine_object.get_keyspace_credentials()
     engine_object.setup_keyspace_connection()
     engine_object.create_table()
