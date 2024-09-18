@@ -69,6 +69,7 @@ class sampling_engine():
         self.keyspace_port = 9142
         self.keyspace_name = None
         self.keyspace_table = None
+        self.fetch_size = 1e6
 
         #Parameters for keyspace table
         self.id_column_name = 'id'
@@ -185,7 +186,7 @@ class sampling_engine():
 
         {self.timestamp_column_name}
 
-        sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} USING TIMESTAMP WHERE {self.timestamp_column_name}>='{query_start_time_string} AND {self.timestamp_column_name}<='{query_end_time_string}';")
+        sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} USING TIMESTAMP WHERE {self.timestamp_column_name}>='{query_start_time_string} AND {self.timestamp_column_name}<='{query_end_time_string}';", fetch_size=self.fetch_size)
         try:
             self.aws_keyspaces_session.execute(sql_statement)
         except:
