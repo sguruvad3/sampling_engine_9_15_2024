@@ -42,12 +42,7 @@ def format_time(input_time:str) -> str:
 def format_date(timestamp_obj:datetime) -> str:
     '''
     Formats calendar date for query on keyspace database
-    '''
-    # if 'UTC' in input_time:
-    #     timestamp_obj = pd.to_datetime(input_time, format='%Y-%m-%d %H:%M:%S.%f %z UTC')
-    # else:
-    #     timestamp_obj = pd.to_datetime(input_time, format='%Y-%m-%d %H:%M:%S.%f%z')
-    
+    '''  
     year = timestamp_obj.year
     month = str(timestamp_obj.month).zfill(2)
     day = str(timestamp_obj.day).zfill(2)
@@ -84,7 +79,7 @@ class sampling_engine():
         self.keyspace_port = 9142
         self.keyspace_name = None
         self.keyspace_table = None
-        self.fetch_size = 1e6
+        self.fetch_size = 1e2
 
         #Parameters for keyspace table
         self.id_column_name = 'id'
@@ -188,8 +183,8 @@ class sampling_engine():
         utc_timezone_object = timezone(utc_time_delta)
         
         current_date = date.today()
-        # start_date = current_date - timedelta(days=2)
-        start_date = current_date - timedelta(days=0)
+        start_date = current_date - timedelta(days=2)
+
         query_start_time = datetime(year=start_date.year, month=start_date.month, day=start_date.day, hour=0, minute=0, second=0, tzinfo=utc_timezone_object)
 
         query_end_time = datetime(year=start_date.year, month=start_date.month, day=start_date.day, hour=23, minute=59, second=59, tzinfo=utc_timezone_object)
@@ -197,18 +192,14 @@ class sampling_engine():
         query_start_time_string = format_date(query_start_time)
         query_end_time_string = format_date(query_end_time)
 
-        sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} WHERE {self.date_column_name}>='{query_start_time_string}' AND {self.date_column_name}<='{query_end_time_string}';", fetch_size=self.fetch_size, consistency_level=ConsistencyLevel.LOCAL_QUORUM)
+        sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} WHERE {self.date_column_name}='{query_end_time_string}' ALLOW FILTERING;")
 
-        print(sql_statement)
-        records = self.aws_keyspaces_session.execute(sql_statement)
-        # try:
-        #     records = self.aws_keyspaces_session.execute(sql_statement)
-        #     print('query success')
-        #     for record in records[0:2]:
-        #         print(record.mmsi)
-        # except:
-        #     print('query fail')
-        #     pass
+        try:
+            records = self.aws_keyspaces_session.execute(sql_statement)
+            for record in records:
+                
+        except:
+            pass
         return
 
 
