@@ -1,10 +1,9 @@
-import asyncio
+# import asyncio
 import boto3
 from botocore.exceptions import ClientError
 import datetime as datetime_object
 from datetime import date, datetime, timedelta, timezone
 from datetime import time as dt_time
-from datetime import datetime as datetime_parser
 from cassandra import ConsistencyLevel
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster
@@ -40,6 +39,21 @@ def format_time(input_time:str) -> str:
     
     return output_time
 
+def format_date(timestamp_obj:datetime) -> str:
+    '''
+    Formats calendar date for query on keyspace database
+    '''
+    # if 'UTC' in input_time:
+    #     timestamp_obj = pd.to_datetime(input_time, format='%Y-%m-%d %H:%M:%S.%f %z UTC')
+    # else:
+    #     timestamp_obj = pd.to_datetime(input_time, format='%Y-%m-%d %H:%M:%S.%f%z')
+    
+    year = timestamp_obj.year
+    month = str(timestamp_obj.month).zfill(2)
+    day = str(timestamp_obj.day).zfill(2)
+    output_date = f'{year}-{month}-{day}'
+    return output_date
+
 class sampling_engine():
     def __init__(self):
         self.aws_user_credentials_path = 'config/ingest-engine-user-1_accessKeys.csv'
@@ -74,15 +88,11 @@ class sampling_engine():
 
         #Parameters for keyspace table
         self.id_column_name = 'id'
-        self.id_column_type = 'uuid'
         self.latitude_column_name = 'lat'
-        self.latitude_column_type = 'float'
         self.longitude_column_name = 'lon'
-        self.longitude_column_type = 'float'
         self.mmsi_column_name = 'mmsi'
-        self.mmsi_column_type = 'varchar'
         self.timestamp_column_name = 'time'
-        self.timestamp_column_type = 'timestamp'
+        self.date_column_name = 'calendar_date'
 
 
         #boto3 objects
@@ -172,28 +182,33 @@ class sampling_engine():
     def select_records(self):
         '''
         Selects records from specified start and end time
+        Previous day
         '''
         utc_time_delta = timedelta(hours=0)
         utc_timezone_object = timezone(utc_time_delta)
         
         current_date = date.today()
-        start_date = current_date - timedelta(days=1)
+        # start_date = current_date - timedelta(days=2)
+        start_date = current_date - timedelta(days=0)
         query_start_time = datetime(year=start_date.year, month=start_date.month, day=start_date.day, hour=0, minute=0, second=0, tzinfo=utc_timezone_object)
 
         query_end_time = datetime(year=start_date.year, month=start_date.month, day=start_date.day, hour=23, minute=59, second=59, tzinfo=utc_timezone_object)
 
-        query_start_time_string = format_time(query_start_time)
-        query_end_time_string = format_time(query_end_time)
+        query_start_time_string = format_date(query_start_time)
+        query_end_time_string = format_date(query_end_time)
 
-        sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} USING TIMESTAMP WHERE {self.timestamp_column_name}>='{query_start_time_string} AND {self.timestamp_column_name}<='{query_end_time_string}';", fetch_size=self.fetch_size)
-        try:
-            records = self.aws_keyspaces_session.execute(sql_statement)
-            print('query success')
-            for record in records[0:2]:
-                print(record.mmsi)
-        except:
-            print('query fail')
-            pass
+        sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} WHERE {self.date_column_name}>='{query_start_time_string}' AND {self.date_column_name}<='{query_end_time_string}';", fetch_size=self.fetch_size, consistency_level=ConsistencyLevel.LOCAL_QUORUM)
+
+        print(sql_statement)
+        records = self.aws_keyspaces_session.execute(sql_statement)
+        # try:
+        #     records = self.aws_keyspaces_session.execute(sql_statement)
+        #     print('query success')
+        #     for record in records[0:2]:
+        #         print(record.mmsi)
+        # except:
+        #     print('query fail')
+        #     pass
         return
 
 
