@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import pandas as pd
+from pathlib import Path
 from ssl import SSLContext, PROTOCOL_TLSv1_2 , CERT_REQUIRED
 
 def format_time(input_time:str) -> str:
@@ -55,6 +56,8 @@ class sampling_engine():
         self.iam_role_credentials_path = 'config/cassandra_iam_role_credentials.csv'
         self.keyspace_endpoint_path = 'config/keyspace_configuration.csv'
         self.cassandra_security_certificate_path = 'config/sf-class2-root.crt'
+
+        self.data_dir = Path('data')
         
         self.aws_user_credentials_dataframe = None
         self.iam_role_credentials_dataframe = None
@@ -88,6 +91,11 @@ class sampling_engine():
         self.mmsi_column_name = 'mmsi'
         self.timestamp_column_name = 'time'
         self.date_column_name = 'calendar_date'
+
+        self.dataframe_raw = None
+        self.dataframe_sampled = None
+
+        self.columns_list = [self.latitude_column_name, self.longitude_column_name, self.mmsi_column_name, self.timestamp_column_name]
 
 
         #boto3 objects
@@ -197,11 +205,44 @@ class sampling_engine():
         try:
             records = self.aws_keyspaces_session.execute(sql_statement)
             for record in records:
+                mmsi = record.mmsi
+                timestamp = record.time
+                lat = record.lat
+                lon = record.lon
+
+                
                 
         except:
             pass
         return
 
+    def reset_dataframe_raw(self):
+        '''
+        Instantiates empty dataframe for storing results in self.dataframe_raw
+        '''
+        self.dataframe_raw = pd.DataFrame(columns=self.columns_list)
+        return
+
+    def reset_dataframe_sampled(self):
+        '''
+        Instantiates empty dataframe for storing results in self.dataframe_sampled
+        '''
+        self.dataframe_sampled = pd.DataFrame(columns=self.columns_list)
+        return
+
+    def clear_dataframe_raw(self):
+        '''
+        Clears self.dataframe_raw from memory
+        '''
+        self.dataframe_raw = None
+        return
+
+    def clear_dataframe_sampled(self):
+        '''
+        Clears self.dataframe_sampled from memory
+        '''
+        self.dataframe_sampled = None
+        return
 
     def clear_aws_user_credentials(self):
         '''
