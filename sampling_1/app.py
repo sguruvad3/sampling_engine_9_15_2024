@@ -82,7 +82,7 @@ class sampling_engine():
         self.keyspace_port = 9142
         self.keyspace_name = None
         self.keyspace_table = None
-        self.fetch_size = 1e2
+        # self.fetch_size = 1e2
 
         #Parameters for keyspace table
         self.id_column_name = 'id'
@@ -96,7 +96,13 @@ class sampling_engine():
         self.dataframe_sampled = None
 
         self.columns_list = [self.latitude_column_name, self.longitude_column_name, self.mmsi_column_name, self.timestamp_column_name]
-
+        self.row_limit = 1e6
+        self.row_counter = None
+        
+        self.latitude_list = None
+        self.longitude_list = None
+        self.mmsi_list = None
+        self.timestamp_list = None
 
         #boto3 objects
         self.aws_sts_client = None
@@ -202,18 +208,53 @@ class sampling_engine():
 
         sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} WHERE {self.date_column_name}='{query_end_time_string}' ALLOW FILTERING;")
 
-        try:
+        try:         
             records = self.aws_keyspaces_session.execute(sql_statement)
-            for record in records:
-                mmsi = record.mmsi
-                timestamp = record.time
+           
+            self.reset_raw_data_lists()
+            self.reset_dataframe_raw()
+            self.reset_row_counter()
+            
+            for record in records[0:2]:
+
                 lat = record.lat
                 lon = record.lon
+                mmsi = record.mmsi
+                timestamp = record.time
 
-                
+                print(type(timestamp))
+
+                # self.latitude_list.append(lat)
+                # self.longitude_list.append(lon)
+                # self.mmsi_list.append(mmsi)
+                # self.timestamp_list.append(timestamp)
                 
         except:
             pass
+        return
+
+    def reset_raw_data_lists(self):
+        '''
+        Resets list objects to empty. Used for storing raw data
+        '''
+        self.latitude_list = []
+        self.longitude_list = []
+        self.mmsi_list = []
+        self.timestamp_list = []
+        return
+
+    def reset_row_counter(self):
+        '''
+        Resets self.row_counter to 1
+        '''
+        self.row_counter = 1
+        return
+
+    def increment_row_counter(self):
+        '''
+        Increments self.row_counter by 1
+        '''
+        self.row_counter += 1
         return
 
     def reset_dataframe_raw(self):
