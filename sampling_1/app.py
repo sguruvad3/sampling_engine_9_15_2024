@@ -98,6 +98,8 @@ class sampling_engine():
         self.columns_list = [self.latitude_column_name, self.longitude_column_name, self.mmsi_column_name, self.timestamp_column_name]
         self.row_limit = 1e6
         self.row_counter = None
+        self.sampled_timestamp_format = '%Y-%m-%d %H:%M:%S'
+        self.raw_file_counter = None
         
         self.latitude_list = None
         self.longitude_list = None
@@ -110,6 +112,8 @@ class sampling_engine():
 
         #timer objects
         self.temporary_credentials_start_time_object = None
+
+
 
         logging.basicConfig(filename="test.log", format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M", level=logging.INFO)
 
@@ -197,7 +201,8 @@ class sampling_engine():
         utc_timezone_object = timezone(utc_time_delta)
         
         current_date = date.today()
-        start_date = current_date - timedelta(days=2)
+        # start_date = current_date - timedelta(days=2)
+        start_date = current_date - timedelta(days=1)
 
         query_start_time = datetime(year=start_date.year, month=start_date.month, day=start_date.day, hour=0, minute=0, second=0, tzinfo=utc_timezone_object)
 
@@ -207,6 +212,8 @@ class sampling_engine():
         query_end_time_string = format_date(query_end_time)
 
         sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} WHERE {self.date_column_name}='{query_end_time_string}' ALLOW FILTERING;")
+
+        records = self.aws_keyspaces_session.execute(sql_statement)
 
         try:         
             records = self.aws_keyspaces_session.execute(sql_statement)
@@ -221,16 +228,40 @@ class sampling_engine():
                 lon = record.lon
                 mmsi = record.mmsi
                 timestamp = record.time
+                formatted_timestamp = timestamp.strftime(self.sampled_timestamp_format)
 
                 print(type(timestamp))
 
-                # self.latitude_list.append(lat)
-                # self.longitude_list.append(lon)
-                # self.mmsi_list.append(mmsi)
-                # self.timestamp_list.append(timestamp)
+                self.latitude_list.append(lat)
+                self.longitude_list.append(lon)
+                self.mmsi_list.append(mmsi)
+                self.timestamp_list.append(timestamp)
+
+                if self.row_counter > self.row_limit:
+
+                    self.make_dataframe()
+
+                    self.clear_dataframe_raw()
+                    self.reset_raw_data_lists()
+                    self.reset_row_counter()
+
+
+                self.increment_row_counter()
                 
         except:
             pass
+        return
+
+    def make_dataframe(self):
+        '''
+        Constructs self.dataframe_raw from data contained in self.columns_list
+        '''
+        self.dataframe_raw = pd.DataFrame(columns=self.columns_list)
+        self.dataframe_raw[self.latitude_column_name] = self.latitude_list
+        self.dataframe_raw[self.longitude_column_name] = self.longitude_list
+        self.dataframe_raw[self.mmsi_column_name] = self.mmsi_list
+        self.dataframe_raw[self.timestamp_column_name] = self.timestamp_list
+
         return
 
     def reset_raw_data_lists(self):
@@ -255,6 +286,20 @@ class sampling_engine():
         Increments self.row_counter by 1
         '''
         self.row_counter += 1
+        return
+
+    def reset_raw_file_counter(self):
+        '''
+        Resets counter for files containing raw data
+        '''
+        self.raw_file_counter = 1
+        return
+
+    def increment_raw_file_counter(self):
+        '''
+        Increments self.raw_file_counter by 1
+        '''
+        self.raw_file_counter += 1
         return
 
     def reset_dataframe_raw(self):
