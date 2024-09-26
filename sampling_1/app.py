@@ -110,6 +110,7 @@ class sampling_engine():
         self.keyspace_name = None
         self.keyspace_table = None
         # self.fetch_size = 1e2
+        self.raw_data_select_timeout_seconds = 60
 
         #Parameters for keyspace table
         self.id_column_name = 'id'
@@ -238,12 +239,10 @@ class sampling_engine():
 
         sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} WHERE {self.date_column_name}='{query_end_time_string}' ALLOW FILTERING;")
 
-        records = self.aws_keyspaces_session.execute(sql_statement)
-
         try:         
             message = f'started select query for {query_start_time_string}'
             logging.info(message)
-            records = self.aws_keyspaces_session.execute(sql_statement)
+            records = self.aws_keyspaces_session.execute(statement=sql_statement, timeout=self.raw_data_select_timeout_seconds)
             message = f'completed select query for {query_start_time_string}'
             logging.info(message)
            
