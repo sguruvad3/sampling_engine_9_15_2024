@@ -52,13 +52,40 @@ def format_date(timestamp_obj:datetime) -> str:
 
 class sampling_engine():
     def __init__(self):
-        self.aws_user_credentials_path = 'config/ingest-engine-user-1_accessKeys.csv'
-        self.iam_role_credentials_path = 'config/cassandra_iam_role_credentials.csv'
-        self.keyspace_endpoint_path = 'config/keyspace_configuration.csv'
-        self.cassandra_security_certificate_path = 'config/sf-class2-root.crt'
-
+        '''
+        '''
         self.data_dir = Path('data')
+        self.config_dir = Path('config')
+
+        self.raw_data_folder = 'raw'
+        self.log_folder = 'log'
+        self.credentials_folder = 'credentials'
+
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+
+        self.aws_user_credentials_filename = 'ingest-engine-user-1_accessKeys.csv'
+        self.iam_role_credentials_filename = 'cassandra_iam_role_credentials.csv'
+        self.keyspace_endpoint_filename = 'keyspace_configuration.csv'
+        self.cassandra_security_certificate_filename = 'sf-class2-root.crt'
+
+        self.credentials_dir = self.config_dir / self.credentials_folder
+        self.credentials_dir.mkdir(parents=True, exist_ok=True)
+
+        self.aws_user_credentials_path = self.credentials_dir / self.aws_user_credentials_filename
+        self.iam_role_credentials_path = self.credentials_dir / self.iam_role_credentials_filename
+        self.keyspace_endpoint_path = self.credentials_dir / self.keyspace_endpoint_filename
+        self.cassandra_security_certificate_path = self.credentials_dir / self.cassandra_security_certificate_filename
         
+        self.raw_data_dir = self.data_dir / self.raw_data_folder
+        self.raw_data_dir.mkdir(parents=True, exist_ok=True)
+        self.raw_data_formatted_filename = None
+
+        self.log_dir = self.config_dir / self.log_folder
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        log_filename = f'{date.today()}.log'
+        self.log_path = self.log_dir / log_filename
+
         self.aws_user_credentials_dataframe = None
         self.iam_role_credentials_dataframe = None
         self.keyspace_endpoint_dataframe = None
@@ -100,6 +127,7 @@ class sampling_engine():
         self.row_counter = None
         self.sampled_timestamp_format = '%Y-%m-%d %H:%M:%S'
         self.raw_file_counter = None
+        self.raw_filename_timestamp_format = '%Y%m%d%H%M%S'
         
         self.latitude_list = None
         self.longitude_list = None
@@ -113,9 +141,7 @@ class sampling_engine():
         #timer objects
         self.temporary_credentials_start_time_object = None
 
-
-
-        logging.basicConfig(filename="test.log", format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M", level=logging.INFO)
+        logging.basicConfig(filename=str(self.log_path), format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M", level=logging.INFO, filemode='a')
 
         return
 
@@ -201,7 +227,6 @@ class sampling_engine():
         utc_timezone_object = timezone(utc_time_delta)
         
         current_date = date.today()
-        # start_date = current_date - timedelta(days=2)
         start_date = current_date - timedelta(days=1)
 
         query_start_time = datetime(year=start_date.year, month=start_date.month, day=start_date.day, hour=0, minute=0, second=0, tzinfo=utc_timezone_object)
@@ -216,21 +241,28 @@ class sampling_engine():
         records = self.aws_keyspaces_session.execute(sql_statement)
 
         try:         
+            message = f'started select query for {query_start_time_string}'
+            logging.info(message)
             records = self.aws_keyspaces_session.execute(sql_statement)
+            message = f'completed select query for {query_start_time_string}'
+            logging.info(message)
            
             self.reset_raw_data_lists()
             self.reset_dataframe_raw()
             self.reset_row_counter()
+            self.reset_raw_file_counter()
+
+            message = 'started raw data file writes'
+            logging.info(message)
             
-            for record in records[0:2]:
+            for record in records:
 
                 lat = record.lat
                 lon = record.lon
                 mmsi = record.mmsi
                 timestamp = record.time
                 formatted_timestamp = timestamp.strftime(self.sampled_timestamp_format)
-
-                print(type(timestamp))
+                self.raw_data_formatted_filename = timestamp.strftime(self.raw_filename_timestamp_format)
 
                 self.latitude_list.append(lat)
                 self.longitude_list.append(lon)
@@ -240,16 +272,32 @@ class sampling_engine():
                 if self.row_counter > self.row_limit:
 
                     self.make_dataframe()
+                    self.write_raw_data_file()
+
+                    message = f'completed raw data file {self.raw_data_formatted_filename}'
+                    logging.info(message)
 
                     self.clear_dataframe_raw()
                     self.reset_raw_data_lists()
                     self.reset_row_counter()
 
+                    self.increment_raw_file_counter()
 
                 self.increment_row_counter()
                 
         except:
             pass
+        return
+
+    def write_raw_data_file(self):
+        '''
+        Writes raw data to file
+        Output: self.raw_data_dir
+        '''
+        filename = self.raw_data_formatted_filename + 'parquet.gzip'
+        out_path = self.raw_data_dir / filename
+        if not self.dataframe_raw.empty:
+            self.dataframe_raw.to_parquet(str(out_path))
         return
 
     def make_dataframe(self):
@@ -261,7 +309,6 @@ class sampling_engine():
         self.dataframe_raw[self.longitude_column_name] = self.longitude_list
         self.dataframe_raw[self.mmsi_column_name] = self.mmsi_list
         self.dataframe_raw[self.timestamp_column_name] = self.timestamp_list
-
         return
 
     def reset_raw_data_lists(self):
