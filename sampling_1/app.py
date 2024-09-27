@@ -253,62 +253,57 @@ class sampling_engine():
         end_day = query_end_time.day
         end_hour = query_end_time.hour
 
-        sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} WHERE (({self.year_column_name}>={start_year} AND {self.year_column_name}<={end_year}) AND ({self.month_column_name}>={start_month} AND {self.month_column_name}<={end_month})) AND (({self.day_column_name}>={start_day} AND {self.day_column_name}<={end_day}) AND ({self.hour_column_name}>={start_hour} AND {self.hour_column_name}<={end_hour})) ALLOW FILTERING;")
+        # sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} WHERE (({self.year_column_name}>={start_year} AND {self.year_column_name}<={end_year}) AND ({self.month_column_name}>={start_month} AND {self.month_column_name}<={end_month})) AND (({self.day_column_name}>={start_day} AND {self.day_column_name}<={end_day}) AND ({self.hour_column_name}>={start_hour} AND {self.hour_column_name}<={end_hour})) ALLOW FILTERING;")
 
+        sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} WHERE {self.year_column_name}>={start_year} AND {self.year_column_name}<={end_year} AND {self.month_column_name}>={start_month} AND {self.month_column_name}<={end_month} AND {self.day_column_name}>={start_day} AND {self.day_column_name}<={end_day} AND {self.hour_column_name}>={start_hour} AND {self.hour_column_name}<={end_hour} ALLOW FILTERING;")
 
-
-        print(sql_statement)
-
-
-        records = self.aws_keyspaces_session.execute(sql_statement)
-
-        # try:         
-        #     message = f'started select query for {query_start_time_string}'
-        #     logging.info(message)
-        #     records = self.aws_keyspaces_session.execute(statement=sql_statement, timeout=self.raw_data_select_timeout_seconds)
-        #     message = f'completed select query for {query_start_time_string}'
-        #     logging.info(message)
+        try:         
+            message = f'started select query for {query_start_time_string}'
+            logging.info(message)
+            records = self.aws_keyspaces_session.execute(statement=sql_statement, timeout=self.raw_data_select_timeout_seconds)
+            message = f'completed select query for {query_start_time_string}'
+            logging.info(message)
            
-        #     self.reset_raw_data_lists()
-        #     self.reset_dataframe_raw()
-        #     self.reset_row_counter()
-        #     self.reset_raw_file_counter()
+            self.reset_raw_data_lists()
+            self.reset_dataframe_raw()
+            self.reset_row_counter()
+            self.reset_raw_file_counter()
 
-        #     message = 'started raw data file writes'
-        #     logging.info(message)
+            message = 'started raw data file writes'
+            logging.info(message)
             
-        #     for record in records:
+            for record in records:
 
-        #         lat = record.lat
-        #         lon = record.lon
-        #         mmsi = record.mmsi
-        #         timestamp = record.time
-        #         formatted_timestamp = timestamp.strftime(self.sampled_timestamp_format)
-        #         self.raw_data_formatted_filename = timestamp.strftime(self.raw_filename_timestamp_format)
+                lat = record.lat
+                lon = record.lon
+                mmsi = record.mmsi
+                timestamp = record.time
+                formatted_timestamp = timestamp.strftime(self.sampled_timestamp_format)
+                self.raw_data_formatted_filename = timestamp.strftime(self.raw_filename_timestamp_format)
 
-        #         self.latitude_list.append(lat)
-        #         self.longitude_list.append(lon)
-        #         self.mmsi_list.append(mmsi)
-        #         self.timestamp_list.append(timestamp)
+                self.latitude_list.append(lat)
+                self.longitude_list.append(lon)
+                self.mmsi_list.append(mmsi)
+                self.timestamp_list.append(timestamp)
 
-        #         if self.row_counter > self.row_limit:
+                if self.row_counter > self.row_limit:
 
-        #             self.make_dataframe()
-        #             self.write_raw_data_file()
+                    self.make_dataframe()
+                    self.write_raw_data_file()
 
-        #             message = f'completed raw data file {self.raw_data_formatted_filename}'
-        #             logging.info(message)
+                    message = f'completed raw data file {self.raw_data_formatted_filename}'
+                    logging.info(message)
 
-        #             self.clear_dataframe_raw()
-        #             self.reset_raw_data_lists()
-        #             self.reset_row_counter()
+                    self.clear_dataframe_raw()
+                    self.reset_raw_data_lists()
+                    self.reset_row_counter()
 
-        #             self.increment_raw_file_counter()
+                    self.increment_raw_file_counter()
 
-        #         self.increment_row_counter()
+                self.increment_row_counter()
                 
-        # except:
-        #     pass
+        except:
+            pass
         return
 
     def write_raw_data_file(self):
