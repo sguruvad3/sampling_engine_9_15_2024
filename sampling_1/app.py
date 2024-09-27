@@ -129,7 +129,7 @@ class sampling_engine():
         self.dataframe_sampled = None
 
         self.columns_list = [self.latitude_column_name, self.longitude_column_name, self.mmsi_column_name, self.timestamp_column_name]
-        self.row_limit = 1e6
+        self.row_limit = 1e5
         self.row_counter = None
         self.sampled_timestamp_format = '%Y-%m-%d %H:%M:%S'
         self.raw_file_counter = None
@@ -240,8 +240,8 @@ class sampling_engine():
 
         query_end_time = datetime(year=start_date.year, month=start_date.month, day=start_date.day, hour=23, minute=59, second=59, tzinfo=utc_timezone_object)
 
-        # query_start_time_string = format_date(query_start_time)
-        # query_end_time_string = format_date(query_end_time)
+        query_start_time_string = format_date(query_start_time)
+        query_end_time_string = format_date(query_end_time)
 
         start_year = query_start_time.year
         start_month = query_start_time.month
@@ -253,57 +253,70 @@ class sampling_engine():
         end_day = query_end_time.day
         end_hour = query_end_time.hour
 
-        # sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} WHERE (({self.year_column_name}>={start_year} AND {self.year_column_name}<={end_year}) AND ({self.month_column_name}>={start_month} AND {self.month_column_name}<={end_month})) AND (({self.day_column_name}>={start_day} AND {self.day_column_name}<={end_day}) AND ({self.hour_column_name}>={start_hour} AND {self.hour_column_name}<={end_hour})) ALLOW FILTERING;")
-
         sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} WHERE {self.year_column_name}>={start_year} AND {self.year_column_name}<={end_year} AND {self.month_column_name}>={start_month} AND {self.month_column_name}<={end_month} AND {self.day_column_name}>={start_day} AND {self.day_column_name}<={end_day} AND {self.hour_column_name}>={start_hour} AND {self.hour_column_name}<={end_hour} ALLOW FILTERING;")
 
-        try:         
-            message = f'started select query for {query_start_time_string}'
-            logging.info(message)
-            records = self.aws_keyspaces_session.execute(statement=sql_statement, timeout=self.raw_data_select_timeout_seconds)
-            message = f'completed select query for {query_start_time_string}'
-            logging.info(message)
-           
-            self.reset_raw_data_lists()
-            self.reset_dataframe_raw()
-            self.reset_row_counter()
-            self.reset_raw_file_counter()
+        # try:         
+        message = f'started select query for {query_start_time_string}'
+        logging.info(message)
+        records = self.aws_keyspaces_session.execute(sql_statement)
+        message = f'completed select query for {query_start_time_string}'
+        logging.info(message)
+        
+        self.reset_raw_data_lists()
+        self.reset_dataframe_raw()
+        self.reset_row_counter()
+        self.reset_raw_file_counter()
 
-            message = 'started raw data file writes'
-            logging.info(message)
+        message = 'started raw data file writes'
+        logging.info(message)
+        
+        for record in records:
+
+            lat = record.lat
+            lon = record.lon
+            mmsi = record.mmsi
+            timestamp = record.time
+            formatted_timestamp = timestamp.strftime(self.sampled_timestamp_format)
+            self.raw_data_formatted_filename = timestamp.strftime(self.raw_filename_timestamp_format)
+
+            self.latitude_list.append(lat)
+            self.longitude_list.append(lon)
+            self.mmsi_list.append(mmsi)
+            self.timestamp_list.append(timestamp)
+
+            if self.row_counter%1e4 == 0 and self.row_counter >= 1e4:
+                message = f'appended {self.row_counter} to lists'
+                logging.info(message)
+
+            if  self.row_counter % self.row_limit == 0 and self.row_counter >= self.row_limit:
+
+                self.make_raw_dataframe()
+                self.write_raw_data_file()
+
+                message = f'completed raw data file {self.raw_data_formatted_filename}'
+                logging.info(message)
+
+                self.clear_dataframe_raw()
+                self.reset_raw_data_lists()
+                self.reset_row_counter()
+
+                self.increment_raw_file_counter()
             
-            for record in records:
+            elif self.row_counter < self.row_limit and self.raw_file_counter > 1:
+                self.make_raw_dataframe()
+                self.write_raw_data_file()
 
-                lat = record.lat
-                lon = record.lon
-                mmsi = record.mmsi
-                timestamp = record.time
-                formatted_timestamp = timestamp.strftime(self.sampled_timestamp_format)
-                self.raw_data_formatted_filename = timestamp.strftime(self.raw_filename_timestamp_format)
+                message = f'completed raw data file {self.raw_data_formatted_filename}'
+                logging.info(message)
 
-                self.latitude_list.append(lat)
-                self.longitude_list.append(lon)
-                self.mmsi_list.append(mmsi)
-                self.timestamp_list.append(timestamp)
+                self.clear_dataframe_raw()
+                self.reset_raw_data_lists()
+                self.reset_row_counter()
 
-                if self.row_counter > self.row_limit:
-
-                    self.make_dataframe()
-                    self.write_raw_data_file()
-
-                    message = f'completed raw data file {self.raw_data_formatted_filename}'
-                    logging.info(message)
-
-                    self.clear_dataframe_raw()
-                    self.reset_raw_data_lists()
-                    self.reset_row_counter()
-
-                    self.increment_raw_file_counter()
-
-                self.increment_row_counter()
-                
-        except:
-            pass
+            self.increment_row_counter()
+        self.reset_raw_file_counter()
+        # except:
+        #     pass
         return
 
     def write_raw_data_file(self):
@@ -314,10 +327,10 @@ class sampling_engine():
         filename = self.raw_data_formatted_filename + 'parquet.gzip'
         out_path = self.raw_data_dir / filename
         if not self.dataframe_raw.empty:
-            self.dataframe_raw.to_parquet(str(out_path))
+            self.dataframe_raw.to_parquet(str(out_path), engine='pyarrow')
         return
 
-    def make_dataframe(self):
+    def make_raw_dataframe(self):
         '''
         Constructs self.dataframe_raw from data contained in self.columns_list
         '''
