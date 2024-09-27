@@ -253,7 +253,7 @@ class sampling_engine():
         end_day = query_end_time.day
         end_hour = query_end_time.hour
 
-        sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} WHERE ((({self.year_column_name}>={start_year} AND {self.year_column_name}<={end_year}) AND ({self.month_column_name}>={start_month} AND {self.month_column_name}<={end_month})) AND ({self.day_column_name}>={start_day} AND {self.day_column_name}<={end_day})) AND ({self.hour_column_name}>={start_hour} AND {self.hour_column_name}<={end_hour}) ALLOW FILTERING';")
+        sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} WHERE (({self.year_column_name}>={start_year} AND {self.year_column_name}<={end_year}) AND ({self.month_column_name}>={start_month} AND {self.month_column_name}<={end_month})) AND (({self.day_column_name}>={start_day} AND {self.day_column_name}<={end_day}) AND ({self.hour_column_name}>={start_hour} AND {self.hour_column_name}<={end_hour})) ALLOW FILTERING;")
 
 
 
