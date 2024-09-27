@@ -7,6 +7,7 @@ from datetime import time as dt_time
 from cassandra import ConsistencyLevel
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster
+from cassandra.metadata import ColumnMetadata
 from cassandra.query import SimpleStatement
 from cassandra_sigv4.auth import SigV4AuthProvider
 import json
@@ -109,7 +110,7 @@ class sampling_engine():
         self.keyspace_port = 9142
         self.keyspace_name = None
         self.keyspace_table = None
-        # self.fetch_size = 1e2
+        self.fetch_size = 1e2
         self.raw_data_select_timeout_seconds = 60
 
         #Parameters for keyspace table
@@ -118,7 +119,11 @@ class sampling_engine():
         self.longitude_column_name = 'lon'
         self.mmsi_column_name = 'mmsi'
         self.timestamp_column_name = 'time'
-        self.date_column_name = 'calendar_date'
+        self.year_column_name = 'year'
+        self.month_column_name = 'month'
+        self.day_column_name = 'day'
+        self.hour_column_name = 'hour'
+        # self.partition_keys = [ColumnMetadata(name=self.id_column_name), ColumnMetadata(name=self.date_column_name), ColumnMetadata(name=self.date_column_name)]
 
         self.dataframe_raw = None
         self.dataframe_sampled = None
@@ -235,10 +240,25 @@ class sampling_engine():
 
         query_end_time = datetime(year=start_date.year, month=start_date.month, day=start_date.day, hour=23, minute=59, second=59, tzinfo=utc_timezone_object)
 
-        query_start_time_string = format_date(query_start_time)
-        query_end_time_string = format_date(query_end_time)
+        # query_start_time_string = format_date(query_start_time)
+        # query_end_time_string = format_date(query_end_time)
 
-        sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} WHERE {self.date_column_name}='{query_end_time_string}' ALLOW FILTERING;")
+        start_year = query_start_time.year
+        start_month = query_start_time.month
+        start_day = query_start_time.day
+        start_hour = query_start_time.hour
+
+        end_year = query_end_time.year
+        end_month = query_end_time.month
+        end_day = query_end_time.day
+        end_hour = query_end_time.hour
+
+        sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} WHERE ((({self.year_column_name}>={start_year} AND {self.year_column_name}<={end_year}) AND ({self.month_column_name}>={start_month} AND {self.month_column_name}<={end_month})) AND ({self.day_column_name}>={start_day} AND {self.day_column_name}<={end_day})) AND ({self.hour_column_name}>={start_hour} AND {self.hour_column_name}<={end_hour}) ALLOW FILTERING';")
+
+
+
+        print(sql_statement)
+
 
         records = self.aws_keyspaces_session.execute(sql_statement)
 
