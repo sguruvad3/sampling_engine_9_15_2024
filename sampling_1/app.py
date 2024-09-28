@@ -15,6 +15,7 @@ import logging
 import os
 import pandas as pd
 from pathlib import Path
+import shutil
 from ssl import SSLContext, PROTOCOL_TLSv1_2 , CERT_REQUIRED
 
 def format_time(input_time:str) -> str:
@@ -129,7 +130,7 @@ class sampling_engine():
         self.dataframe_sampled = None
 
         self.columns_list = [self.latitude_column_name, self.longitude_column_name, self.mmsi_column_name, self.timestamp_column_name]
-        self.row_limit = 1e5
+        self.row_limit = 1e6
         self.row_counter = None
         self.sampled_timestamp_format = '%Y-%m-%d %H:%M:%S'
         self.raw_file_counter = None
@@ -284,15 +285,11 @@ class sampling_engine():
             self.mmsi_list.append(mmsi)
             self.timestamp_list.append(timestamp)
 
-            if self.row_counter%1e4 == 0 and self.row_counter >= 1e4:
-                message = f'appended {self.row_counter} to lists'
-                logging.info(message)
 
-            if  self.row_counter % self.row_limit == 0 and self.row_counter >= self.row_limit:
+            if  self.row_counter == self.row_limit:
 
                 self.make_raw_dataframe()
-                self.write_raw_data_file()
-
+                # self.write_raw_data_file()
                 message = f'completed raw data file {self.raw_data_formatted_filename}'
                 logging.info(message)
 
@@ -302,11 +299,12 @@ class sampling_engine():
 
                 self.increment_raw_file_counter()
             
+            #last chunk
             elif self.row_counter < self.row_limit and self.raw_file_counter > 1:
                 self.make_raw_dataframe()
-                self.write_raw_data_file()
+                # self.write_raw_data_file()
 
-                message = f'completed raw data file {self.raw_data_formatted_filename}'
+                message = f'completed last raw data file {self.raw_data_formatted_filename}'
                 logging.info(message)
 
                 self.clear_dataframe_raw()
@@ -430,10 +428,23 @@ class sampling_engine():
         self.aws_keyspaces_session = None
         return
 
+    def delete_raw_data_files(self):
+        '''
+        Deletes raw data files from disk
+        '''
+        files_list = list(self.raw_data_dir.glob('*'))
+        # shutil.rmtree(str(self.raw_data_dir))
+        for file in files_list:
+            file.unlink()
+        message = 'deleted raw data files'
+        logging.info(message)
+        return
+
 if __name__ == "__main__":
     engine_object = sampling_engine()
     engine_object.get_keyspace_credentials()
     engine_object.setup_keyspace_connection()
+    # engine_object.delete_raw_data_files()
     engine_object.select_records()
 
 
