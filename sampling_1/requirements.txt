@@ -1,6 +1,8 @@
 boto3==1.35.6
-# cqlsh-expansion==0.9.6
+cqlsh-expansion==0.9.6
 cassandra-driver==3.29.1
 cassandra-sigv4==4.0.2
 pandas==2.2.2
+pandera==0.20.4
+pyarrow==17.0.0
 schedule==1.2.2

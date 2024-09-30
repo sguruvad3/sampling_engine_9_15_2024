@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import pandas as pd
+import pandera as pa
 from pathlib import Path
 import shutil
 from ssl import SSLContext, PROTOCOL_TLSv1_2 , CERT_REQUIRED
@@ -138,6 +139,7 @@ class sampling_engine():
         self.raw_file_counter = None
         self.raw_filename_timestamp_format = '%Y%m%d%H%M%S'
         self.raw_file_limit = 10
+        self.sampling_resolution = "5Min"
         
         self.latitude_list = None
         self.longitude_list = None
@@ -150,6 +152,10 @@ class sampling_engine():
 
         #timer objects
         self.temporary_credentials_start_time_object = None
+
+        #pandera parameters
+        self.raw_data_schema = pa.DataFrameSchema({self.timestamp_column_name: Column('datetime64   [ns]'), \
+            self.mmsi_column_name: Column('float64')})
 
         logging.basicConfig(filename=str(self.log_path), format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M", level=logging.INFO, filemode='w')
 
@@ -304,7 +310,7 @@ class sampling_engine():
                     self.increment_raw_file_counter()
                 
                 #last chunk           
-                if self.raw_file_counter == self.raw_file_limit and self.total_row_counter==self.total_row_limit:
+                if self.raw_file_counter == self.raw_file_limit and self.total_row_counter>=self.total_row_limit:
 
                     self.make_raw_dataframe()
                     self.write_raw_data_file()
@@ -350,8 +356,14 @@ class sampling_engine():
         Sample records from raw data files
         '''
         files_list = list(self.raw_data_dir.glob('*'))
-        for file_path in files_list:
-            dataframe_raw_data = pd.read_parquet(str(file_path), engine=)
+        for file_path in files_list[0:1]:
+            dataframe_raw_data = pd.read_parquet(str(file_path), engine='pyarrow')
+            dataframe_raw_data = dataframe_raw_data.sort_values(self.mmsi_column_name)
+            # dataframe_sampled_data = dataframe_raw_data.groupby(self.mmsi_column_name).first()
+            print(dataframe_raw_data.dtypes)
+            # print(dataframe_raw_data.shape[0])
+            # dataframe_raw_data = dataframe_raw_data.resample(self.sampling_resolution).last()
+            # print(dataframe_raw_data.shape[0])
 
 
         return
@@ -474,10 +486,11 @@ class sampling_engine():
 
 if __name__ == "__main__":
     engine_object = sampling_engine()
-    engine_object.get_keyspace_credentials()
-    engine_object.setup_keyspace_connection()
+    # engine_object.get_keyspace_credentials()
+    # engine_object.setup_keyspace_connection()
     # engine_object.delete_raw_data_files()
-    engine_object.select_records()
+    # engine_object.select_records()
+    engine_object.sample_raw_records()
 
 
 
