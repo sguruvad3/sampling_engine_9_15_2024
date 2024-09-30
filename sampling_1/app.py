@@ -275,8 +275,6 @@ class sampling_engine():
             message = 'started raw data file writes'
             logging.info(message)
 
-            print
-        
             for record in records:
                 
                 lat = record.lat
@@ -330,10 +328,10 @@ class sampling_engine():
         Writes raw data to file
         Output: self.raw_data_dir
         '''
-        filename = self.raw_data_formatted_filename + 'parquet.gzip'
+        filename = self.raw_data_formatted_filename + '.parquet.gzip'
         out_path = self.raw_data_dir / filename
         if not self.dataframe_raw.empty:
-            self.dataframe_raw.to_parquet(str(out_path), engine='pyarrow')
+            self.dataframe_raw.to_parquet(str(out_path), engine='pyarrow', compression='gzip')
         return
 
     def make_raw_dataframe(self):
@@ -346,6 +344,18 @@ class sampling_engine():
         self.dataframe_raw[self.mmsi_column_name] = self.mmsi_list
         self.dataframe_raw[self.timestamp_column_name] = self.timestamp_list
         return
+
+    def sample_raw_records(self):
+        '''
+        Sample records from raw data files
+        '''
+        files_list = list(self.raw_data_dir.glob('*'))
+        for file_path in files_list:
+            dataframe_raw_data = pd.read_parquet(str(file_path), engine=)
+
+
+        return
+
 
     def reset_raw_data_lists(self):
         '''
