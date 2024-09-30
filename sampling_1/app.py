@@ -132,9 +132,12 @@ class sampling_engine():
         self.columns_list = [self.latitude_column_name, self.longitude_column_name, self.mmsi_column_name, self.timestamp_column_name]
         self.row_limit = 1e6
         self.row_counter = None
+        self.total_row_counter = None
+        self.total_row_limit = 10560779
         self.sampled_timestamp_format = '%Y-%m-%d %H:%M:%S'
         self.raw_file_counter = None
         self.raw_filename_timestamp_format = '%Y%m%d%H%M%S'
+        self.raw_file_limit = 10
         
         self.latitude_list = None
         self.longitude_list = None
@@ -256,65 +259,70 @@ class sampling_engine():
 
         sql_statement = SimpleStatement(f"SELECT {self.latitude_column_name}, {self.longitude_column_name}, {self.mmsi_column_name}, {self.timestamp_column_name} FROM {self.keyspace_name}.{self.keyspace_table} WHERE {self.year_column_name}>={start_year} AND {self.year_column_name}<={end_year} AND {self.month_column_name}>={start_month} AND {self.month_column_name}<={end_month} AND {self.day_column_name}>={start_day} AND {self.day_column_name}<={end_day} AND {self.hour_column_name}>={start_hour} AND {self.hour_column_name}<={end_hour} ALLOW FILTERING;")
 
-        # try:         
-        message = f'started select query for {query_start_time_string}'
-        logging.info(message)
-        records = self.aws_keyspaces_session.execute(sql_statement)
-        message = f'completed select query for {query_start_time_string}'
-        logging.info(message)
-        
-        self.reset_raw_data_lists()
-        self.reset_dataframe_raw()
-        self.reset_row_counter()
-        self.reset_raw_file_counter()
-
-        message = 'started raw data file writes'
-        logging.info(message)
-        
-        for record in records:
-
-            lat = record.lat
-            lon = record.lon
-            mmsi = record.mmsi
-            timestamp = record.time
-            formatted_timestamp = timestamp.strftime(self.sampled_timestamp_format)
-            self.raw_data_formatted_filename = timestamp.strftime(self.raw_filename_timestamp_format)
-
-            self.latitude_list.append(lat)
-            self.longitude_list.append(lon)
-            self.mmsi_list.append(mmsi)
-            self.timestamp_list.append(timestamp)
-
-
-            if  self.row_counter == self.row_limit:
-
-                self.make_raw_dataframe()
-                # self.write_raw_data_file()
-                message = f'completed raw data file {self.raw_data_formatted_filename}'
-                logging.info(message)
-
-                self.clear_dataframe_raw()
-                self.reset_raw_data_lists()
-                self.reset_row_counter()
-
-                self.increment_raw_file_counter()
+        try:         
+            message = f'started select query for {query_start_time_string}'
+            logging.info(message)
+            records = self.aws_keyspaces_session.execute(sql_statement)
+            message = f'completed select query for {query_start_time_string}'
+            logging.info(message)
             
-            #last chunk
-            elif self.row_counter < self.row_limit and self.raw_file_counter > 1:
-                self.make_raw_dataframe()
-                # self.write_raw_data_file()
+            self.reset_raw_data_lists()
+            self.reset_dataframe_raw()
+            self.reset_row_counter()
+            self.reset_total_row_counter()
+            self.reset_raw_file_counter()
 
-                message = f'completed last raw data file {self.raw_data_formatted_filename}'
-                logging.info(message)
+            message = 'started raw data file writes'
+            logging.info(message)
 
-                self.clear_dataframe_raw()
-                self.reset_raw_data_lists()
-                self.reset_row_counter()
+            print
+        
+            for record in records:
+                
+                lat = record.lat
+                lon = record.lon
+                mmsi = record.mmsi
+                timestamp = record.time
+                formatted_timestamp = timestamp.strftime(self.sampled_timestamp_format)
+                self.raw_data_formatted_filename = timestamp.strftime(self.raw_filename_timestamp_format)
 
-            self.increment_row_counter()
-        self.reset_raw_file_counter()
-        # except:
-        #     pass
+                self.latitude_list.append(lat)
+                self.longitude_list.append(lon)
+                self.mmsi_list.append(mmsi)
+                self.timestamp_list.append(timestamp)
+
+                #even chunks
+                if  self.row_counter == self.row_limit:
+            
+                    self.make_raw_dataframe()
+                    self.write_raw_data_file()
+                    message = f'completed raw data file {self.raw_data_formatted_filename}'
+                    logging.info(message)
+
+                    self.clear_dataframe_raw()
+                    self.reset_raw_data_lists()
+                    self.reset_row_counter()
+
+                    self.increment_raw_file_counter()
+                
+                #last chunk           
+                if self.raw_file_counter == self.raw_file_limit and self.total_row_counter==self.total_row_limit:
+
+                    self.make_raw_dataframe()
+                    self.write_raw_data_file()
+
+                    message = f'completed last raw data file {self.raw_data_formatted_filename}'
+                    logging.info(message)
+
+                    self.clear_dataframe_raw()
+                    self.reset_raw_data_lists()
+                    self.reset_row_counter()
+
+                self.increment_row_counter()
+                self.increment_total_row_counter()
+        
+        except:
+            pass
         return
 
     def write_raw_data_file(self):
@@ -361,6 +369,20 @@ class sampling_engine():
         Increments self.row_counter by 1
         '''
         self.row_counter += 1
+        return
+
+    def reset_total_row_counter(self):
+        '''
+        Resets self.total_row_counter to 1
+        '''
+        self.total_row_counter = 1
+        return
+
+    def increment_total_row_counter(self):
+        '''
+        Increments self.total_row_counter by 1
+        '''
+        self.total_row_counter += 1
         return
 
     def reset_raw_file_counter(self):
