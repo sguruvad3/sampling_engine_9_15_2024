@@ -161,7 +161,7 @@ class sampling_engine():
         self.latitude_upper_limit = 90
 
         self.raw_data_schema = pa.DataFrameSchema({ self.timestamp_column_name: Column('datetime64[ns]', nullable=False), 
-                                                    self.mmsi_column_name: Column(str, [Check(lambda s: len(s) == 9)], nullable=False), 
+                                                    self.mmsi_column_name: Column(str, Check.str_length(min_value=9, max_value=9), nullable=False), 
                                                     self.latitude_column_name: Column('float64', Check(lambda s: (s >= self.latitude_lower_limit) & (s <= self.latitude_upper_limit)), nullable=False), 
                                                     self.longitude_column_name: Column('float64', Check(lambda s: (s >= self.longitude_lower_limit) & (s <= self.longitude_upper_limit)), nullable=False)}, drop_invalid_rows=True, coerce=True)
 
@@ -359,9 +359,9 @@ class sampling_engine():
         self.dataframe_raw[self.timestamp_column_name] = self.timestamp_list
         return
 
-    def sample_raw_records(self):
+    def ETL_stage_1(self):
         '''
-        Sample records from raw data files
+        Coerce data to self.raw_data_schema
         '''
         files_list = list(self.raw_data_dir.glob('*'))
         for file_path in files_list[0:1]:
@@ -369,13 +369,11 @@ class sampling_engine():
             try:
                 dataframe_raw_data = self.raw_data_schema.validate(dataframe_raw_data, lazy=True)
             except pa.errors.SchemaError as exc:
-                logging.info(exc)
-            dataframe_raw_data = dataframe_raw_data.sort_values(self.timestamp_column_name)
-            # print(dataframe_raw_data.head())
-            # sample = dataframe_raw_data['mmsi'].value_counts()
-            # print(sample)
-            dataframe_raw_data['mmsi_len'] = dataframe_raw_data['mmsi'].apply(lambda x: len(x))
-            print(dataframe_raw_data['mmsi_len'].value_counts())
+                logging.info(exc.message)
+            mmsi_list = dataframe_raw_data[self.mmsi_column_name].unique().tolist()
+            dataframe_raw_data = dataframe_raw_data.sort_values(by=[self.mmsi_column_name, self.timestamp_column_name])
+            print(dataframe_raw_data.head())
+            print(dataframe_raw_data.shape)
             # dataframe_sampled_data = dataframe_raw_data.groupby(self.mmsi_column_name).first()
             # print(dataframe_raw_data.dtypes)
             # print(dataframe_raw_data.shape[0])
@@ -507,7 +505,7 @@ if __name__ == "__main__":
     # engine_object.setup_keyspace_connection()
     # engine_object.delete_raw_data_files()
     # engine_object.select_records()
-    engine_object.sample_raw_records()
+    engine_object.ETL_stage_1()
 
 
 
