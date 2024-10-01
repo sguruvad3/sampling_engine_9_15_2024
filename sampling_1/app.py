@@ -15,6 +15,7 @@ import logging
 import os
 import pandas as pd
 import pandera as pa
+from pandera import Column, Check
 from pathlib import Path
 import shutil
 from ssl import SSLContext, PROTOCOL_TLSv1_2 , CERT_REQUIRED
@@ -154,8 +155,15 @@ class sampling_engine():
         self.temporary_credentials_start_time_object = None
 
         #pandera parameters
-        self.raw_data_schema = pa.DataFrameSchema({self.timestamp_column_name: Column('datetime64   [ns]'), \
-            self.mmsi_column_name: Column('float64')})
+        self.longitude_lower_limit = -180
+        self.longitude_upper_limit = 180
+        self.latitude_lower_limit = -90
+        self.latitude_upper_limit = 90
+
+        self.raw_data_schema = pa.DataFrameSchema({ self.timestamp_column_name: Column('datetime64[ns]', nullable=False), 
+                                                    self.mmsi_column_name: Column(str, Check(lambda s: len(s) == 9), nullable=False), 
+                                                    self.latitude_column_name: Column('float64', Check(lambda s: (s >= self.latitude_lower_limit) & (s <= self.latitude_upper_limit)), nullable=False), 
+                                                    self.longitude_column_name: Column('float64', Check(lambda s: (s >= self.longitude_lower_limit) & (s <= self.longitude_upper_limit)), nullable=False)}, coerce=True)
 
         logging.basicConfig(filename=str(self.log_path), format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M", level=logging.INFO, filemode='w')
 
@@ -358,9 +366,15 @@ class sampling_engine():
         files_list = list(self.raw_data_dir.glob('*'))
         for file_path in files_list[0:1]:
             dataframe_raw_data = pd.read_parquet(str(file_path), engine='pyarrow')
-            dataframe_raw_data = dataframe_raw_data.sort_values(self.mmsi_column_name)
+
+            try:
+                dataframe_raw_data = self.raw_data_schema.validate(dataframe_raw_data)
+                print(dataframe_raw_data.head())
+            except pa.errors.SchemaError as exc:
+                print(exc)
+            # dataframe_raw_data = dataframe_raw_data.sort_values(self.mmsi_column_name)
             # dataframe_sampled_data = dataframe_raw_data.groupby(self.mmsi_column_name).first()
-            print(dataframe_raw_data.dtypes)
+            # print(dataframe_raw_data.dtypes)
             # print(dataframe_raw_data.shape[0])
             # dataframe_raw_data = dataframe_raw_data.resample(self.sampling_resolution).last()
             # print(dataframe_raw_data.shape[0])
