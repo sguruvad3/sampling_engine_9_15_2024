@@ -161,9 +161,9 @@ class sampling_engine():
         self.latitude_upper_limit = 90
 
         self.raw_data_schema = pa.DataFrameSchema({ self.timestamp_column_name: Column('datetime64[ns]', nullable=False), 
-                                                    self.mmsi_column_name: Column(str, Check(lambda s: len(s) == 9), nullable=False), 
+                                                    self.mmsi_column_name: Column(str, [Check(lambda s: len(s) == 9)], nullable=False), 
                                                     self.latitude_column_name: Column('float64', Check(lambda s: (s >= self.latitude_lower_limit) & (s <= self.latitude_upper_limit)), nullable=False), 
-                                                    self.longitude_column_name: Column('float64', Check(lambda s: (s >= self.longitude_lower_limit) & (s <= self.longitude_upper_limit)), nullable=False)}, coerce=True)
+                                                    self.longitude_column_name: Column('float64', Check(lambda s: (s >= self.longitude_lower_limit) & (s <= self.longitude_upper_limit)), nullable=False)}, drop_invalid_rows=True, coerce=True)
 
         logging.basicConfig(filename=str(self.log_path), format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M", level=logging.INFO, filemode='w')
 
@@ -366,13 +366,16 @@ class sampling_engine():
         files_list = list(self.raw_data_dir.glob('*'))
         for file_path in files_list[0:1]:
             dataframe_raw_data = pd.read_parquet(str(file_path), engine='pyarrow')
-
             try:
-                dataframe_raw_data = self.raw_data_schema.validate(dataframe_raw_data)
-                print(dataframe_raw_data.head())
+                dataframe_raw_data = self.raw_data_schema.validate(dataframe_raw_data, lazy=True)
             except pa.errors.SchemaError as exc:
-                print(exc)
-            # dataframe_raw_data = dataframe_raw_data.sort_values(self.mmsi_column_name)
+                logging.info(exc)
+            dataframe_raw_data = dataframe_raw_data.sort_values(self.timestamp_column_name)
+            # print(dataframe_raw_data.head())
+            # sample = dataframe_raw_data['mmsi'].value_counts()
+            # print(sample)
+            dataframe_raw_data['mmsi_len'] = dataframe_raw_data['mmsi'].apply(lambda x: len(x))
+            print(dataframe_raw_data['mmsi_len'].value_counts())
             # dataframe_sampled_data = dataframe_raw_data.groupby(self.mmsi_column_name).first()
             # print(dataframe_raw_data.dtypes)
             # print(dataframe_raw_data.shape[0])
