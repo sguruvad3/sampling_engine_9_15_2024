@@ -369,9 +369,13 @@ class sampling_engine():
         Sample raw data at rate 
         Source: self.raw_data_dir
         Destination: self.sampled_data_dir
-
+        '''
+        message = 'begin resample of all raw data files'
+        logging.info(message)
         files_list = list(self.raw_data_dir.glob('*'))
         for file_path in files_list[0:1]:
+            message = f'begin resample of file {file_path.name}'
+            logging.info(message)
             dataframe_raw_data = pd.read_parquet(str(file_path), engine='pyarrow')
             try:
                 dataframe_raw_data = self.raw_data_schema.validate(dataframe_raw_data, lazy=True)
@@ -388,8 +392,10 @@ class sampling_engine():
                 dataframe_raw_data_resampled = dataframe_raw_data_selection.resample(rule=self.sampling_resolution, on=self.timestamp_column_name).last()
                 if not dataframe_raw_data_resampled.empty:
                     dataframe_sampled_data = pd.concat([dataframe_sampled_data, dataframe_raw_data_resampled], ignore_index=True)
-                
-
+            message = f'end resample of file {file_path.name}'
+            logging.info(message)
+        message = 'end resample of all raw data files'
+        logging.info(message)
         return
 
 
