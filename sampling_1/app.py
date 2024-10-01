@@ -368,8 +368,8 @@ class sampling_engine():
         Coerce data to self.raw_data_schema
         Sample raw data at rate 
         Source: self.raw_data_dir
-        Destination: 
-        '''
+        Destination: self.sampled_data_dir
+
         files_list = list(self.raw_data_dir.glob('*'))
         for file_path in files_list[0:1]:
             dataframe_raw_data = pd.read_parquet(str(file_path), engine='pyarrow')
@@ -380,24 +380,15 @@ class sampling_engine():
             mmsi_list = dataframe_raw_data[self.mmsi_column_name].unique().tolist()
             dataframe_raw_data = dataframe_raw_data.sort_values(by=[self.mmsi_column_name, self.timestamp_column_name])
             dataframe_sampled_data = pd.DataFrame(columns=dataframe_raw_data.columns)
-            for mmsi in mmsi_list[0:1]:
+            dataframe_raw_data = dataframe_raw_data.reset_index(drop=True)
+            for mmsi in mmsi_list:
                 condition = dataframe_raw_data[self.mmsi_column_name] == mmsi
                 index_selection = dataframe_raw_data.index[condition]
                 dataframe_raw_data_selection = dataframe_raw_data.iloc[index_selection]
-                # dataframe_raw_data_selection = dataframe_raw_data_selection.reset_index(drop=True)
-                # time_column_sampled = dataframe_raw_data_selection[self.timestamp_column_name].resample(self.sampling_resolution).last()
-                # time_column_sampled.index
-                # dataframe_sampled_data = pd.concat([dataframe_sampled_data, dataframe_raw_data_selection], ignore_index=True)
+                dataframe_raw_data_resampled = dataframe_raw_data_selection.resample(rule=self.sampling_resolution, on=self.timestamp_column_name).last()
+                if not dataframe_raw_data_resampled.empty:
+                    dataframe_sampled_data = pd.concat([dataframe_sampled_data, dataframe_raw_data_resampled], ignore_index=True)
                 
-
-            print(dataframe_raw_data.head())
-            print(dataframe_raw_data.shape)
-            # dataframe_sampled_data = dataframe_raw_data.groupby(self.mmsi_column_name).first()
-            # print(dataframe_raw_data.dtypes)
-            # print(dataframe_raw_data.shape[0])
-            # dataframe_raw_data = dataframe_raw_data.resample(self.sampling_resolution).last()
-            # print(dataframe_raw_data.shape[0])
-
 
         return
 
