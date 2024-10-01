@@ -62,6 +62,7 @@ class sampling_engine():
         self.config_dir = Path('config')
 
         self.raw_data_folder = 'raw'
+        self.sampled_data_folder = 'sampled'
         self.log_folder = 'log'
         self.credentials_folder = 'credentials'
 
@@ -84,6 +85,9 @@ class sampling_engine():
         self.raw_data_dir = self.data_dir / self.raw_data_folder
         self.raw_data_dir.mkdir(parents=True, exist_ok=True)
         self.raw_data_formatted_filename = None
+
+        self.sampled_data_dir = self.data_dir / self.sampled_data_folder
+        self.sampled_data_dir.mkdir(parents=True, exist_ok=True)
 
         self.log_dir = self.config_dir / self.log_folder
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -362,6 +366,9 @@ class sampling_engine():
     def ETL_stage_1(self):
         '''
         Coerce data to self.raw_data_schema
+        Sample raw data at rate 
+        Source: self.raw_data_dir
+        Destination: 
         '''
         files_list = list(self.raw_data_dir.glob('*'))
         for file_path in files_list[0:1]:
@@ -372,6 +379,17 @@ class sampling_engine():
                 logging.info(exc.message)
             mmsi_list = dataframe_raw_data[self.mmsi_column_name].unique().tolist()
             dataframe_raw_data = dataframe_raw_data.sort_values(by=[self.mmsi_column_name, self.timestamp_column_name])
+            dataframe_sampled_data = pd.DataFrame(columns=dataframe_raw_data.columns)
+            for mmsi in mmsi_list[0:1]:
+                condition = dataframe_raw_data[self.mmsi_column_name] == mmsi
+                index_selection = dataframe_raw_data.index[condition]
+                dataframe_raw_data_selection = dataframe_raw_data.iloc[index_selection]
+                # dataframe_raw_data_selection = dataframe_raw_data_selection.reset_index(drop=True)
+                # time_column_sampled = dataframe_raw_data_selection[self.timestamp_column_name].resample(self.sampling_resolution).last()
+                # time_column_sampled.index
+                # dataframe_sampled_data = pd.concat([dataframe_sampled_data, dataframe_raw_data_selection], ignore_index=True)
+                
+
             print(dataframe_raw_data.head())
             print(dataframe_raw_data.shape)
             # dataframe_sampled_data = dataframe_raw_data.groupby(self.mmsi_column_name).first()
