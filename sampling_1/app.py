@@ -384,6 +384,7 @@ class sampling_engine():
         message = 'begin resample of all raw data files'
         logging.info(message)
         files_list = list(self.raw_data_dir.glob('*'))
+        
         for file_path in files_list:
             message = f'begin resample of file {file_path.name}'
             logging.info(message)
@@ -397,17 +398,27 @@ class sampling_engine():
             self.dataframe_raw = self.dataframe_raw.sort_values(by=[self.mmsi_column_name, self.timestamp_column_name])
             self.dataframe_raw = self.dataframe_raw.reset_index(drop=True)
             self.reset_dataframe_sampled()
+            mmsi_counter = 1
             for mmsi in mmsi_list:
                 condition = self.dataframe_raw[self.mmsi_column_name] == mmsi
                 index_selection = self.dataframe_raw.index[condition]
                 dataframe_raw_data_selection = self.dataframe_raw.iloc[index_selection]
-                dataframe_raw_data_resampled = dataframe_raw_data_selection.resample(rule=self.sampling_resolution, on=self.timestamp_column_name).last()
+                dataframe_raw_data_resampled = self.dataframe_raw.resample(rule=self.sampling_resolution, on=self.timestamp_column_name).last()
                 if not dataframe_raw_data_resampled.empty:
                     self.dataframe_sampled = pd.concat([self.dataframe_sampled, dataframe_raw_data_resampled], ignore_index=True)
-            print(self.dataframe_sampled.shape)
+                
+                if mmsi_counter % 1e2 ==0 and mmsi_counter >=1e2:
+                    message = f'mmsi processed: {mmsi_counter}'
+                    logging.info(message)
+                mmsi_counter += 1
+            
             self.write_sampled_data_file()
             message = f'end resample of file {file_path.name}'
             logging.info(message)
+
+                
+                
+
         message = 'end resample of all raw data files'
         logging.info(message)
         return
