@@ -88,6 +88,7 @@ class sampling_engine():
 
         self.sampled_data_dir = self.data_dir / self.sampled_data_folder
         self.sampled_data_dir.mkdir(parents=True, exist_ok=True)
+        self.sampled_data_formatted_filename = None
 
         self.log_dir = self.config_dir / self.log_folder
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -130,7 +131,6 @@ class sampling_engine():
         self.month_column_name = 'month'
         self.day_column_name = 'day'
         self.hour_column_name = 'hour'
-        # self.partition_keys = [ColumnMetadata(name=self.id_column_name), ColumnMetadata(name=self.date_column_name), ColumnMetadata(name=self.date_column_name)]
 
         self.dataframe_raw = None
         self.dataframe_sampled = None
@@ -363,6 +363,17 @@ class sampling_engine():
         self.dataframe_raw[self.timestamp_column_name] = self.timestamp_list
         return
 
+    def write_sampled_data_file(self):
+        '''
+        Writes sampled data to file
+        Output: self.sampled_data_dir
+        '''
+        filename = self.sampled_data_formatted_filename + '.parquet.gzip'
+        out_path = self.sampled_data_dir / filename
+        if not self.dataframe_sampled.empty:
+            self.dataframe_sampled.to_parquet(str(out_path), engine='pyarrow', compression='gzip')
+        return
+
     def ETL_stage_1(self):
         '''
         Coerce data to self.raw_data_schema
@@ -373,25 +384,28 @@ class sampling_engine():
         message = 'begin resample of all raw data files'
         logging.info(message)
         files_list = list(self.raw_data_dir.glob('*'))
-        for file_path in files_list[0:1]:
+        for file_path in files_list:
             message = f'begin resample of file {file_path.name}'
             logging.info(message)
-            dataframe_raw_data = pd.read_parquet(str(file_path), engine='pyarrow')
+            self.dataframe_raw = pd.read_parquet(str(file_path), engine='pyarrow')
+            self.sampled_data_formatted_filename = file_path.stem.split('.')[0]
             try:
-                dataframe_raw_data = self.raw_data_schema.validate(dataframe_raw_data, lazy=True)
+                self.dataframe_raw = self.raw_data_schema.validate(self.dataframe_raw, lazy=True)
             except pa.errors.SchemaError as exc:
                 logging.info(exc.message)
-            mmsi_list = dataframe_raw_data[self.mmsi_column_name].unique().tolist()
-            dataframe_raw_data = dataframe_raw_data.sort_values(by=[self.mmsi_column_name, self.timestamp_column_name])
-            dataframe_sampled_data = pd.DataFrame(columns=dataframe_raw_data.columns)
-            dataframe_raw_data = dataframe_raw_data.reset_index(drop=True)
+            mmsi_list = self.dataframe_raw[self.mmsi_column_name].unique().tolist()
+            self.dataframe_raw = self.dataframe_raw.sort_values(by=[self.mmsi_column_name, self.timestamp_column_name])
+            self.dataframe_raw = self.dataframe_raw.reset_index(drop=True)
+            self.reset_dataframe_sampled()
             for mmsi in mmsi_list:
-                condition = dataframe_raw_data[self.mmsi_column_name] == mmsi
-                index_selection = dataframe_raw_data.index[condition]
-                dataframe_raw_data_selection = dataframe_raw_data.iloc[index_selection]
+                condition = self.dataframe_raw[self.mmsi_column_name] == mmsi
+                index_selection = self.dataframe_raw.index[condition]
+                dataframe_raw_data_selection = self.dataframe_raw.iloc[index_selection]
                 dataframe_raw_data_resampled = dataframe_raw_data_selection.resample(rule=self.sampling_resolution, on=self.timestamp_column_name).last()
                 if not dataframe_raw_data_resampled.empty:
-                    dataframe_sampled_data = pd.concat([dataframe_sampled_data, dataframe_raw_data_resampled], ignore_index=True)
+                    self.dataframe_sampled = pd.concat([self.dataframe_sampled, dataframe_raw_data_resampled], ignore_index=True)
+            print(self.dataframe_sampled.shape)
+            self.write_sampled_data_file()
             message = f'end resample of file {file_path.name}'
             logging.info(message)
         message = 'end resample of all raw data files'
