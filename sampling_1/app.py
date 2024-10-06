@@ -169,16 +169,19 @@ class model_engine():
         self.delta_latitude_limit = 1
 
         #secondary column names
-        self.delta_time = 'delta_time'
-        self.delta_longitude = 'delta_lon'
-        self.delta_latitude = 'delta_lat'
+        self.delta_time_column_name = 'delta_time'
+        self.delta_longitude_column_name = 'delta_lon'
+        self.delta_latitude_column_name = 'delta_lat'
     
 
         self.raw_data_schema = pa.DataFrameSchema({ self.timestamp_column_name: Column('datetime64[ns]', nullable=False), 
                                                     self.mmsi_column_name: Column(str, Check.str_length(min_value=9, max_value=9), nullable=False), 
                                                     self.latitude_column_name: Column('float64', Check(lambda s: (s >= self.latitude_lower_limit) & (s <= self.latitude_upper_limit)), nullable=False), 
                                                     self.longitude_column_name: Column('float64', Check(lambda s: (s >= self.longitude_lower_limit) & (s <= self.longitude_upper_limit)), nullable=False),
-                                                    self.delta_time: Column(pd.TimeDelta, Check())}, drop_invalid_rows=True, coerce=True)
+                                                    self.delta_time_column_name: Column(pd.Timedelta, Check(lambda s: (s <= self.delta_time_limit)), nullable= False),
+                                                    self.delta_latitude_column_name: Column('float64', Check(lambda s: (s <= self.delta_latitude_limit))),
+                                                    self.delta_longitude_column_name: Column('float64', Check(lambda s: (s <= self.delta_longitude_column_name)))
+                                                    }, drop_invalid_rows=True, coerce=True)
 
         logging.basicConfig(filename=str(self.log_path), format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M", level=logging.INFO, filemode='w')
 
@@ -395,7 +398,7 @@ class model_engine():
         message = 'begin ETL stage 1 on all data files'
         logging.info(message)
         files_list = list(self.raw_data_dir.glob('*'))        
-        for file_path in files_list:
+        for file_path in files_list[0:1]:
             message = f'begin stage 1 of file {file_path.name}'
             logging.info(message)
             self.dataframe_raw = pd.read_parquet(str(file_path), engine='pyarrow')
@@ -433,7 +436,30 @@ class model_engine():
         '''
         Adds columns for dropping rows exceeding telemetry thresholds
         '''
+        #sort by time column
+        self.dataframe_raw = self.dataframe_raw.sort_values(by=[self.timestamp_column_name])
 
+        #copy columns
+        self.dataframe_raw['time_copy'] = self.dataframe_raw[self.timestamp_column_name]
+        self.dataframe_raw['latitude_copy'] = self.dataframe_raw[self.latitude_column_name]
+        self.dataframe_raw['longitude_copy'] = self.dataframe_raw[self.longitude_column_name]
+
+        #shift copied columns
+        self.dataframe_raw['time_copy'] = self.dataframe_raw['time_copy'].shift(1)
+        self.dataframe_raw['latitude_copy'] = self.dataframe_raw['latitude_copy'].shift(1)
+        self.dataframe_raw['longitude_copy'] = self.dataframe_raw['longitude_copy'].shift(1)
+
+        #drop NaN from copied columns
+        self.dataframe_raw = self.dataframe_raw.dropna(subset=['time_copy', 'latitude_copy', 'longitude_copy'])
+
+        #compute delta columns
+        self.dataframe_raw[self.delta_time_column_name] = self.dataframe_raw[self.timestamp_column_name] - self.dataframe_raw['time_copy']
+        self.dataframe_raw[self.delta_longitude_column_name] = (self.dataframe_raw['latitude_copy'] - self.dataframe_raw[self.latitude_column_name]).abs()
+        self.dataframe_raw[self.delta_latitude_column_name] = (self.dataframe_raw['longitude_copy'] - self.dataframe_raw[self.longitude_column_name]).abs()
+
+        #drop copied columns
+        self.dataframe_raw = self.dataframe_raw.drop(columns=['time_copy', 'latitude_copy', 'longitude_copy'])
+        self.dataframe_raw = self.dataframe_raw.reset_index(drop=True)
         return
 
     def reset_raw_data_lists(self):
