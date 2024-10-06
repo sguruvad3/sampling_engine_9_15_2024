@@ -54,7 +54,7 @@ def format_date(timestamp_obj:datetime) -> str:
     output_date = f'{year}-{month}-{day}'
     return output_date
 
-class sampling_engine():
+class model_engine():
     def __init__(self):
         '''
         '''
@@ -62,7 +62,7 @@ class sampling_engine():
         self.config_dir = Path('config')
 
         self.raw_data_folder = 'raw'
-        self.sampled_data_folder = 'sampled'
+        self.stage_1_folder = 'stage_1'
         self.log_folder = 'log'
         self.credentials_folder = 'credentials'
 
@@ -86,9 +86,9 @@ class sampling_engine():
         self.raw_data_dir.mkdir(parents=True, exist_ok=True)
         self.raw_data_formatted_filename = None
 
-        self.sampled_data_dir = self.data_dir / self.sampled_data_folder
-        self.sampled_data_dir.mkdir(parents=True, exist_ok=True)
-        self.sampled_data_formatted_filename = None
+        self.stage_1_dir = self.data_dir / self.stage_1_folder
+        self.stage_1_dir.mkdir(parents=True, exist_ok=True)
+        self.stage_1_formatted_filename = None
 
         self.log_dir = self.config_dir / self.log_folder
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -133,7 +133,7 @@ class sampling_engine():
         self.hour_column_name = 'hour'
 
         self.dataframe_raw = None
-        self.dataframe_sampled = None
+        self.dataframe_stage_1 = None
 
         self.columns_list = [self.latitude_column_name, self.longitude_column_name, self.mmsi_column_name, self.timestamp_column_name]
         self.row_limit = 1e6
@@ -363,15 +363,15 @@ class sampling_engine():
         self.dataframe_raw[self.timestamp_column_name] = self.timestamp_list
         return
 
-    def write_sampled_data_file(self):
+    def write_stage_1_data_file(self):
         '''
-        Writes sampled data to file
-        Output: self.sampled_data_dir
+        Writes stage 1 data to file
+        Output: self.stage_1_dir
         '''
-        filename = self.sampled_data_formatted_filename + '.parquet.gzip'
-        out_path = self.sampled_data_dir / filename
-        if not self.dataframe_sampled.empty:
-            self.dataframe_sampled.to_parquet(str(out_path), engine='pyarrow', compression='gzip')
+        filename = self.stage_1_formatted_filename + '.parquet.gzip'
+        out_path = self.stage_1_dir / filename
+        if not self.dataframe_stage_1.empty:
+            self.dataframe_stage_1.to_parquet(str(out_path), engine='pyarrow', compression='gzip')
         return
 
     def ETL_stage_1(self):
@@ -379,47 +379,42 @@ class sampling_engine():
         Coerce data to self.raw_data_schema
         Sample raw data at rate 
         Source: self.raw_data_dir
-        Destination: self.sampled_data_dir
+        Destination: self.stage_1_dir
         '''
-        message = 'begin resample of all raw data files'
+        message = 'begin ETL stage 1 on all data files'
         logging.info(message)
         files_list = list(self.raw_data_dir.glob('*'))
         
         for file_path in files_list:
-            message = f'begin resample of file {file_path.name}'
+            message = f'begin stage 1 of file {file_path.name}'
             logging.info(message)
             self.dataframe_raw = pd.read_parquet(str(file_path), engine='pyarrow')
             self.sampled_data_formatted_filename = file_path.stem.split('.')[0]
             try:
-                self.dataframe_raw = self.raw_data_schema.validate(self.dataframe_raw, lazy=True)
+                self.dataframe_stage_1 = self.raw_data_schema.validate(self.dataframe_raw, lazy=True)
             except pa.errors.SchemaError as exc:
                 logging.info(exc.message)
-            mmsi_list = self.dataframe_raw[self.mmsi_column_name].unique().tolist()
-            self.dataframe_raw = self.dataframe_raw.sort_values(by=[self.mmsi_column_name, self.timestamp_column_name])
-            self.dataframe_raw = self.dataframe_raw.reset_index(drop=True)
-            self.reset_dataframe_sampled()
-            mmsi_counter = 1
-            for mmsi in mmsi_list:
-                condition = self.dataframe_raw[self.mmsi_column_name] == mmsi
-                index_selection = self.dataframe_raw.index[condition]
-                dataframe_raw_data_selection = self.dataframe_raw.iloc[index_selection]
-                dataframe_raw_data_resampled = self.dataframe_raw.resample(rule=self.sampling_resolution, on=self.timestamp_column_name).last()
-                if not dataframe_raw_data_resampled.empty:
-                    self.dataframe_sampled = pd.concat([self.dataframe_sampled, dataframe_raw_data_resampled], ignore_index=True)
+            # mmsi_list = self.dataframe_raw[self.mmsi_column_name].unique().tolist()
+            # self.dataframe_raw = self.dataframe_raw.sort_values(by=[self.mmsi_column_name, self.timestamp_column_name])
+            # self.dataframe_raw = self.dataframe_raw.reset_index(drop=True)
+            # self.reset_dataframe_sampled()
+            # mmsi_counter = 1
+            # for mmsi in mmsi_list:
+            #     condition = self.dataframe_raw[self.mmsi_column_name] == mmsi
+            #     index_selection = self.dataframe_raw.index[condition]
+            #     dataframe_raw_data_selection = self.dataframe_raw.iloc[index_selection]
+            #     dataframe_raw_data_resampled = self.dataframe_raw.resample(rule=self.sampling_resolution, on=self.timestamp_column_name).last()
+            #     if not dataframe_raw_data_resampled.empty:
+            #         self.dataframe_sampled = pd.concat([self.dataframe_sampled, dataframe_raw_data_resampled], ignore_index=True)
                 
-                if mmsi_counter % 1e2 ==0 and mmsi_counter >=1e2:
-                    message = f'mmsi processed: {mmsi_counter}'
-                    logging.info(message)
-                mmsi_counter += 1
-            
-            self.write_sampled_data_file()
-            message = f'end resample of file {file_path.name}'
+            #     if mmsi_counter % 1e2 ==0 and mmsi_counter >=1e2:
+            #         message = f'mmsi processed: {mmsi_counter}'
+            #         logging.info(message)
+            #     mmsi_counter += 1     
+            self.write_stage_1_data_file()
+            message = f'end stage 1 of file {file_path.name}'
             logging.info(message)
-
-                
-                
-
-        message = 'end resample of all raw data files'
+        message = 'end ETL stage 1 on all files'
         logging.info(message)
         return
 
@@ -540,7 +535,7 @@ class sampling_engine():
         return
 
 if __name__ == "__main__":
-    engine_object = sampling_engine()
+    engine_object = model_engine()
     # engine_object.get_keyspace_credentials()
     # engine_object.setup_keyspace_connection()
     # engine_object.delete_raw_data_files()
