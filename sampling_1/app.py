@@ -164,10 +164,21 @@ class model_engine():
         self.latitude_lower_limit = -90
         self.latitude_upper_limit = 90
 
+        self.delta_time_limit = pd.Timedelta(hours=1)
+        self.delta_longitude_limit = 1
+        self.delta_latitude_limit = 1
+
+        #secondary column names
+        self.delta_time = 'delta_time'
+        self.delta_longitude = 'delta_lon'
+        self.delta_latitude = 'delta_lat'
+    
+
         self.raw_data_schema = pa.DataFrameSchema({ self.timestamp_column_name: Column('datetime64[ns]', nullable=False), 
                                                     self.mmsi_column_name: Column(str, Check.str_length(min_value=9, max_value=9), nullable=False), 
                                                     self.latitude_column_name: Column('float64', Check(lambda s: (s >= self.latitude_lower_limit) & (s <= self.latitude_upper_limit)), nullable=False), 
-                                                    self.longitude_column_name: Column('float64', Check(lambda s: (s >= self.longitude_lower_limit) & (s <= self.longitude_upper_limit)), nullable=False)}, drop_invalid_rows=True, coerce=True)
+                                                    self.longitude_column_name: Column('float64', Check(lambda s: (s >= self.longitude_lower_limit) & (s <= self.longitude_upper_limit)), nullable=False),
+                                                    self.delta_time: Column(pd.TimeDelta, Check())}, drop_invalid_rows=True, coerce=True)
 
         logging.basicConfig(filename=str(self.log_path), format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M", level=logging.INFO, filemode='w')
 
@@ -383,12 +394,12 @@ class model_engine():
         '''
         message = 'begin ETL stage 1 on all data files'
         logging.info(message)
-        files_list = list(self.raw_data_dir.glob('*'))
-        
+        files_list = list(self.raw_data_dir.glob('*'))        
         for file_path in files_list:
             message = f'begin stage 1 of file {file_path.name}'
             logging.info(message)
             self.dataframe_raw = pd.read_parquet(str(file_path), engine='pyarrow')
+            self.add_secondary_columns()
             self.sampled_data_formatted_filename = file_path.stem.split('.')[0]
             try:
                 self.dataframe_stage_1 = self.raw_data_schema.validate(self.dataframe_raw, lazy=True)
@@ -418,6 +429,12 @@ class model_engine():
         logging.info(message)
         return
 
+    def add_secondary_columns(self):
+        '''
+        Adds columns for dropping rows exceeding telemetry thresholds
+        '''
+
+        return
 
     def reset_raw_data_lists(self):
         '''
