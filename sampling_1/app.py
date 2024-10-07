@@ -19,6 +19,7 @@ from pandera import Column, Check
 from pathlib import Path
 import shutil
 from ssl import SSLContext, PROTOCOL_TLSv1_2 , CERT_REQUIRED
+from vessel import vessel
 
 def format_time(input_time:str) -> str:
     '''
@@ -138,6 +139,7 @@ class model_engine():
 
         self.dataframe_raw = None
         self.dataframe_stage_1 = None
+        self.dataframe_stage_2 = None
 
         self.columns_list = [self.latitude_column_name, self.longitude_column_name, self.mmsi_column_name, self.timestamp_column_name]
         self.row_limit = 1e6
@@ -186,6 +188,9 @@ class model_engine():
                                                     self.delta_latitude_column_name: Column('float64', Check(lambda s: (s <= self.delta_latitude_limit))),
                                                     self.delta_longitude_column_name: Column('float64', Check(lambda s: (s <= self.delta_longitude_column_name)))
                                                     }, drop_invalid_rows=True, coerce=True)
+
+        #mmsi retrieval
+        self.vessel_type_retrieval_engine = None
 
         logging.basicConfig(filename=str(self.log_path), format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M", level=logging.INFO, filemode='w')
 
@@ -253,6 +258,13 @@ class model_engine():
         self.cluster_object = Cluster([self.keyspace_endpoint], ssl_context=self.ssl_context, auth_provider=self.auth_provider, port=self.keyspace_port)
         self.aws_keyspaces_session = self.cluster_object.connect()
         # self.aws_keyspaces_session.default_timeout = self.raw_data_select_timeout_seconds
+        return
+
+    def setup_vessel_type_retrieval_engine(self):
+        '''
+        Instantiates object for retrieving vessel types bases on mmsi
+        '''
+        self.vessel_type_retrieval_engine = vessel()
         return
 
     def select_all(self):
@@ -434,12 +446,39 @@ class model_engine():
             logging.info(message)
         message = 'end ETL stage 1 on all files'
         logging.info(message)
+        self.clear_dataframe_raw()
+        self.clear_dataframe_stage_1()
         return
 
     def ETL_stage_2(self):
         '''
         Requests vessel types and performs join on each data file
+        Input: self.stage_1_dir
+        Output: self.stage_2_dir
         '''
+        message = 'begin ETL stage2 on all data files'
+        logging.info(message)
+        files_list = list(self.stage_1_dir.glob('*'))      
+        total_mmsi_list = []
+        self.setup_vessel_type_retrieval_engine()  
+        for file_path in files_list:
+            message = f'begin stage 2 of file {file_path.name}'
+            logging.info(message)
+            self.dataframe_stage_1 = pd.read_parquet(str(file_path), engine='pyarrow')
+            mmsi_list_temp = self.dataframe_stage_1[self.mmsi_column_name].unique().tolist()
+            total_mmsi_list.extend(mmsi_list_temp)
+            dataframe_vessel_types = self.vessel_type_retrieval_engine.get_vessel_type(total_mmsi_list)
+
+
+            message = f'end stage 2 of file {file_path.name}'
+            logging.info(message)
+        message = 'end ETL stage 2 on all files'
+        logging.info(message)
+        self.clear_dataframe_stage_1()
+        self.clear_dataframe_stage_2()
+        self.clear_vessel_type_retrieval_engine()
+
+        
         return
 
     def add_secondary_columns(self):
@@ -545,11 +584,18 @@ class model_engine():
         self.dataframe_raw = None
         return
 
-    def clear_dataframe_sampled(self):
+    def clear_dataframe_stage_1(self):
         '''
-        Clears self.dataframe_sampled from memory
+        Clears self.dataframe_stage_1 from memory
         '''
-        self.dataframe_sampled = None
+        self.dataframe_stage_1 = None
+        return
+
+    def clear_dataframe_stage_2(self):
+        '''
+        Clears self.dataframe_stage_2 from memory
+        '''
+        self.dataframe_stage_2 = None
         return
 
     def clear_aws_user_credentials(self):
@@ -575,17 +621,46 @@ class model_engine():
         self.aws_keyspaces_session = None
         return
 
+    def clear_vessel_type_retrieval_engine(self):
+        '''
+        Clears self.vessel_type_retrieval_engine from memory
+        '''
+        self.vessel_type_retrieval_engine = None
+        return
+
     def delete_raw_data_files(self):
         '''
         Deletes raw data files from disk
         '''
         files_list = list(self.raw_data_dir.glob('*'))
-        # shutil.rmtree(str(self.raw_data_dir))
         for file in files_list:
             file.unlink()
         message = 'deleted raw data files'
         logging.info(message)
         return
+
+    def delete_stage_1_data_files(self):
+        '''
+        Deletes stage 1 data files from disk
+        '''
+        files_list = list(self.stage_1_dir.glob('*'))
+        for file in files_list:
+            file.unlink()
+        message = 'deleted stage 1 data files'
+        logging.info(message)
+        return
+
+    def delete_stage_2_data_files(self):
+        '''
+        Deletes stage 2 data files from disk
+        '''
+        files_list = list(self.stage_2_dir.glob('*'))
+        for file in files_list:
+            file.unlink()
+        message = 'deleted stage 2 data files'
+        logging.info(message)
+        return
+
 
 if __name__ == "__main__":
     engine_object = model_engine()
@@ -593,8 +668,12 @@ if __name__ == "__main__":
     # engine_object.setup_keyspace_connection()
     # engine_object.select_records()
 
-    engine_object.ETL_stage_1()
+    # engine_object.ETL_stage_1()
+    engine_object.ETL_stage_2()
+
     # engine_object.delete_raw_data_files()
+    # engine_object.delete_stage_1_data_files()
+    # engine_object.delete_stage_2_data_files()
     
 
 
