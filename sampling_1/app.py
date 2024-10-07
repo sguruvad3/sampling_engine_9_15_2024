@@ -459,16 +459,20 @@ class model_engine():
         message = 'begin ETL stage2 on all data files'
         logging.info(message)
         files_list = list(self.stage_1_dir.glob('*'))      
+        vessel_types_list = []
         total_mmsi_list = []
         self.setup_vessel_type_retrieval_engine()  
-        for file_path in files_list:
+        
+        for file_path in files_list[0:1]:
             message = f'begin stage 2 of file {file_path.name}'
             logging.info(message)
             self.dataframe_stage_1 = pd.read_parquet(str(file_path), engine='pyarrow')
             mmsi_list_temp = self.dataframe_stage_1[self.mmsi_column_name].unique().tolist()
-            total_mmsi_list.extend(mmsi_list_temp)
-            dataframe_vessel_types = self.vessel_type_retrieval_engine.get_vessel_type(total_mmsi_list)
-
+            # total_mmsi_list.extend(mmsi_list_temp)
+            #dataframe_vessel_types = self.vessel_type_retrieval_engine.get_vessel_type(total_mmsi_list)
+            
+            example_mmsi = mmsi_list_temp[1]
+            vessel_type = self.vessel_type_retrieval_engine.get_vessel_type_single_mmsi(example_mmsi)
 
             message = f'end stage 2 of file {file_path.name}'
             logging.info(message)
