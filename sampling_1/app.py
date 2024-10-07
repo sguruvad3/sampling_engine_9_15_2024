@@ -63,6 +63,7 @@ class model_engine():
 
         self.raw_data_folder = 'raw'
         self.stage_1_folder = 'stage_1'
+        self.stage_2_folder = 'stage_2'
         self.log_folder = 'log'
         self.credentials_folder = 'credentials'
 
@@ -89,6 +90,9 @@ class model_engine():
         self.stage_1_dir = self.data_dir / self.stage_1_folder
         self.stage_1_dir.mkdir(parents=True, exist_ok=True)
         self.stage_1_formatted_filename = None
+
+        self.stage_2_dir = self.data_dir / self.stage_2_folder
+        self.stage_2_dir.mkdir(parents=True, exist_ok=True)
 
         self.log_dir = self.config_dir / self.log_folder
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -398,12 +402,12 @@ class model_engine():
         message = 'begin ETL stage 1 on all data files'
         logging.info(message)
         files_list = list(self.raw_data_dir.glob('*'))        
-        for file_path in files_list[0:1]:
+        for file_path in files_list:
             message = f'begin stage 1 of file {file_path.name}'
             logging.info(message)
             self.dataframe_raw = pd.read_parquet(str(file_path), engine='pyarrow')
             self.add_secondary_columns()
-            self.sampled_data_formatted_filename = file_path.stem.split('.')[0]
+            self.stage_1_formatted_filename = file_path.stem.split('.')[0]
             try:
                 self.dataframe_stage_1 = self.raw_data_schema.validate(self.dataframe_raw, lazy=True)
             except pa.errors.SchemaError as exc:
@@ -430,6 +434,12 @@ class model_engine():
             logging.info(message)
         message = 'end ETL stage 1 on all files'
         logging.info(message)
+        return
+
+    def ETL_stage_2(self):
+        '''
+        Requests vessel types and performs join on each data file
+        '''
         return
 
     def add_secondary_columns(self):
@@ -581,9 +591,11 @@ if __name__ == "__main__":
     engine_object = model_engine()
     # engine_object.get_keyspace_credentials()
     # engine_object.setup_keyspace_connection()
-    # engine_object.delete_raw_data_files()
     # engine_object.select_records()
+
     engine_object.ETL_stage_1()
+    # engine_object.delete_raw_data_files()
+    
 
 
 
