@@ -499,12 +499,12 @@ class model_engine():
         total_mmsi_list = []  
         #retrieve mmsi from data files
         for file_path in files_list[0:1]:
-            message = f'begin vessel type retrieval on file {file_path.name}'
+            message = f'begin mmsi retrieval on file {file_path.name}'
             logging.info(message)
             self.dataframe_stage_1 = pd.read_parquet(str(file_path), engine='pyarrow')
             mmsi_list_temp = self.dataframe_stage_1[self.mmsi_column_name].unique().tolist()
             total_mmsi_list.extend(mmsi_list_temp)
-            message = f'end vessel type retrieval on file {file_path.name}'
+            message = f'end mmsi retrieval on file {file_path.name}'
             logging.info(message)
         total_mmsi_dict = {'mmsi':total_mmsi_list}
         dataframe_total_mmsi = pd.DataFrame.from_dict(total_mmsi_dict)
@@ -521,10 +521,8 @@ class model_engine():
             for index, mmsi in enumerate(filtered_mmsi_list):
                 #retrieve vessel types from API
                 vessel_type = self.vessel_type_retrieval_engine.get_vessel_type_single_mmsi(mmsi)
-                if vessel_type is not None:
-                    vessel_types_list.append(vessel_type)
-                else:
-                    vessel_types_list.append('None')
+                vessel_types_list.append(vessel_type)
+
             dict_output = {self.dataframe_mmsi_column_name:filtered_mmsi_list ,self.dataframe_vessel_type_column_name:vessel_types_list}
             self.dataframe_mmsi_vessel_type = pd.DataFrame.from_dict(dict_output)
             self.save_vessel_info()
@@ -538,10 +536,7 @@ class model_engine():
             for index, mmsi in enumerate(total_mmsi_list):
                 #retrieve vessel types from API
                 vessel_type = self.vessel_type_retrieval_engine.get_vessel_type_single_mmsi(mmsi)
-                if vessel_type is not None:
-                    vessel_types_list.append(vessel_type)
-                else:
-                    vessel_types_list.append('None')
+                vessel_types_list.append(vessel_type)
             dict_output = {self.dataframe_mmsi_column_name:total_mmsi_list ,self.dataframe_vessel_type_column_name:vessel_types_list}
             self.dataframe_mmsi_vessel_type = pd.DataFrame.from_dict(dict_output)
             self.save_vessel_info()
@@ -745,7 +740,7 @@ if __name__ == "__main__":
     # engine_object.select_records()
 
     # engine_object.ETL_stage_1()
-    engine_object.ETL_stage_2()
+    engine_object.get_vessel_type_all_files()
 
     # engine_object.delete_raw_data_files()
     # engine_object.delete_stage_1_data_files()

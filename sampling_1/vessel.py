@@ -66,7 +66,14 @@ class vessel():
         url = f'https://gateway.api.globalfishingwatch.org/v3/vessels/search?where=ssvid="{mmsi}"&datasets[0]=public-global-vessel-identity:latest&includes[0]=MATCH_CRITERIA&includes[1]=OWNERSHIP'
         response = requests.get(url,  headers=headers)
         response_dict = response.json()
-        vessel_type = response_dict['entries'][0]['combinedSourcesInfo'][0]['shiptypes'][0]['name']
+        pprint.pprint(response_dict)
+        if len(response_dict['entries']) == 0:
+            vessel_type = 'Unknown'
+        else:
+            if 'combinedSourcesInfo' in response_dict['entries'][0]:
+                vessel_type = response_dict['entries'][0]['combinedSourcesInfo'][0]['shiptypes'][0]['name']
+            else:
+                vessel_type = 'Unknown'
         return vessel_type
 
     def load_dataframe_api_info(self):
