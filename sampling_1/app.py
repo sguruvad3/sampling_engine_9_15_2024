@@ -67,6 +67,7 @@ class model_engine():
         self.stage_2_folder = 'stage_2'
         self.log_folder = 'log'
         self.credentials_folder = 'credentials'
+        self.vessel_info_folder = 'vessel_info'
 
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.config_dir.mkdir(parents=True, exist_ok=True)
@@ -75,6 +76,7 @@ class model_engine():
         self.iam_role_credentials_filename = 'cassandra_iam_role_credentials.csv'
         self.keyspace_endpoint_filename = 'keyspace_configuration.csv'
         self.cassandra_security_certificate_filename = 'sf-class2-root.crt'
+        self.vessel_type_info_filename = 'vessel_type_info.parquet.gzip'
 
         self.credentials_dir = self.config_dir / self.credentials_folder
         self.credentials_dir.mkdir(parents=True, exist_ok=True)
@@ -83,6 +85,10 @@ class model_engine():
         self.iam_role_credentials_path = self.credentials_dir / self.iam_role_credentials_filename
         self.keyspace_endpoint_path = self.credentials_dir / self.keyspace_endpoint_filename
         self.cassandra_security_certificate_path = self.credentials_dir / self.cassandra_security_certificate_filename
+
+        self.vessel_type_info_dir = self.config_dir / self.vessel_info_folder
+        self.vessel_type_info_dir.mkdir(parents=True, exist_ok=True)
+        self.vessel_type_info_path = self.vessel_type_info_dir / self.vessel_type_info_filename
         
         self.raw_data_dir = self.data_dir / self.raw_data_folder
         self.raw_data_dir.mkdir(parents=True, exist_ok=True)
@@ -140,6 +146,7 @@ class model_engine():
         self.dataframe_raw = None
         self.dataframe_stage_1 = None
         self.dataframe_stage_2 = None
+        self.dataframe_mmsi_vessel_type = None
 
         self.columns_list = [self.latitude_column_name, self.longitude_column_name, self.mmsi_column_name, self.timestamp_column_name]
         self.row_limit = 1e6
@@ -222,6 +229,11 @@ class model_engine():
         self.keyspace_endpoint = self.keyspace_endpoint_dataframe['endpoint'][0]
         self.keyspace_name = self.keyspace_endpoint_dataframe['keyspace'][0]
         self.keyspace_table = self.keyspace_endpoint_dataframe['table'][0]
+        return
+
+    def load_vessel_info(self):
+        '''
+        '''
         return
 
     def get_keyspace_credentials(self):
@@ -462,20 +474,23 @@ class model_engine():
         vessel_types_list = []
         total_mmsi_list = []
         self.setup_vessel_type_retrieval_engine()  
-        
         for file_path in files_list[0:1]:
             message = f'begin stage 2 of file {file_path.name}'
             logging.info(message)
             self.dataframe_stage_1 = pd.read_parquet(str(file_path), engine='pyarrow')
             mmsi_list_temp = self.dataframe_stage_1[self.mmsi_column_name].unique().tolist()
-            # total_mmsi_list.extend(mmsi_list_temp)
-            #dataframe_vessel_types = self.vessel_type_retrieval_engine.get_vessel_type(total_mmsi_list)
-            
-            example_mmsi = mmsi_list_temp[1]
-            vessel_type = self.vessel_type_retrieval_engine.get_vessel_type_single_mmsi(example_mmsi)
-
+            total_mmsi_list.extend(mmsi_list_temp)
             message = f'end stage 2 of file {file_path.name}'
             logging.info(message)
+        total_mmsi_dict = {'mmsi':total_mmsi_list}
+        dataframe_total_mmsi = pd.DataFrame.from_dict(total_mmsi_dict)
+        dataframe_total_mmsi = dataframe_total_mmsi.drop_duplicates(subset='mmsi')
+        dataframe_total_mmsi = dataframe_total_mmsi.reset_index(drop=True)
+        total_mmsi_list = dataframe_total_mmsi['mmsi'].tolist()
+        for mmsi in total_mmsi_list:
+            vessel_type = self.vessel_type_retrieval_engine.get_vessel_type_single_mmsi(mmsi)
+            vessel_types_list.append(vessel_type)
+        
         message = 'end ETL stage 2 on all files'
         logging.info(message)
         self.clear_dataframe_stage_1()
