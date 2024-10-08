@@ -19,6 +19,7 @@ from pandera import Column, Check
 from pathlib import Path
 import shutil
 from ssl import SSLContext, PROTOCOL_TLSv1_2 , CERT_REQUIRED
+from typing import List
 from vessel import vessel
 
 def format_time(input_time:str) -> str:
@@ -147,6 +148,8 @@ class model_engine():
         self.dataframe_stage_1 = None
         self.dataframe_stage_2 = None
         self.dataframe_mmsi_vessel_type = None
+        self.dataframe_mmsi_column_name = 'mmsi'
+        self.dataframe_vessel_type_column_name = 'vessel_type'
 
         self.columns_list = [self.latitude_column_name, self.longitude_column_name, self.mmsi_column_name, self.timestamp_column_name]
         self.row_limit = 1e6
@@ -203,6 +206,12 @@ class model_engine():
 
         return
 
+    def union_mmsi_list(mmsi_list_1:List, mmsi_list_2:List) -> List:
+        '''
+        Returns union of two lists of mmsi numbers. Duplicates removed
+        '''
+        return list(set(mmsi_list_1) | set(mmsi_list_2))
+
     def load_aws_user_credentials(self):
         '''
         Loads credentials for AWS user
@@ -233,7 +242,22 @@ class model_engine():
 
     def load_vessel_info(self):
         '''
+        Loads vessel info to memory
         '''
+        if self.vessel_type_info_path.exists():
+            self.dataframe_mmsi_vessel_type = pd.read_parquet(str(self.vessel_type_info_path), engine='pyarrow')
+            message = 'loaded vessel info to memory'
+            logging.info(message)
+        return
+
+    def save_vessel_info(self):
+        '''
+        Saves vessel info to disk
+        '''
+        if self.vessel_type_info_path.exists():
+            self.dataframe_mmsi_vessel_type = pd.to_parquet(str(self.vessel_type_info_path), engine='pyarrow')
+            message = 'saved vessel info to disk'
+            logging.info(message)
         return
 
     def get_keyspace_credentials(self):
@@ -462,25 +486,25 @@ class model_engine():
         self.clear_dataframe_stage_1()
         return
 
-    def ETL_stage_2(self):
+    def get_vessel_type_all_files(self):
         '''
         Requests vessel types and performs join on each data file
         Input: self.stage_1_dir
-        Output: self.stage_2_dir
+        Output: self.vessel_type_info_path
         '''
-        message = 'begin ETL stage2 on all data files'
+        message = 'begin retrieval of vessel type on all data files'
         logging.info(message)
         files_list = list(self.stage_1_dir.glob('*'))      
         vessel_types_list = []
         total_mmsi_list = []
         self.setup_vessel_type_retrieval_engine()  
         for file_path in files_list[0:1]:
-            message = f'begin stage 2 of file {file_path.name}'
+            message = f'begin vessel type retrieval on file {file_path.name}'
             logging.info(message)
             self.dataframe_stage_1 = pd.read_parquet(str(file_path), engine='pyarrow')
             mmsi_list_temp = self.dataframe_stage_1[self.mmsi_column_name].unique().tolist()
             total_mmsi_list.extend(mmsi_list_temp)
-            message = f'end stage 2 of file {file_path.name}'
+            message = f'end vessel type retrieval on file {file_path.name}'
             logging.info(message)
         total_mmsi_dict = {'mmsi':total_mmsi_list}
         dataframe_total_mmsi = pd.DataFrame.from_dict(total_mmsi_dict)
@@ -489,12 +513,28 @@ class model_engine():
         total_mmsi_list = dataframe_total_mmsi['mmsi'].tolist()
         for mmsi in total_mmsi_list:
             vessel_type = self.vessel_type_retrieval_engine.get_vessel_type_single_mmsi(mmsi)
-            vessel_types_list.append(vessel_type)
-        
-        message = 'end ETL stage 2 on all files'
+            if vessel_type is not None:
+                vessel_types_list.append(vessel_type)
+            else:
+                vessel_types_list.append('None')
+        self.load_vessel_info()
+        if self.dataframe_mmsi_vessel_type is not None:
+            stored_mmsi_list = self.dataframe_mmsi_vessel_type[self.dataframe_mmsi_column_name].tolist()
+            filtered_mmsi_list = self.union_mmsi_list(total_mmsi_list, stored_mmsi_list)
+
+
+        else:
+            dict_output = {self.dataframe_mmsi_column_name:total_mmsi_list ,self.dataframe_vessel_type_column_name:vessel_types_list}
+            self.dataframe_mmsi_vessel_type = pd.DataFrame.from_dict(dict_output)
+            self.save_vessel_info()
+            message = f'retrieved {len(total_mmsi_list)} vessel types'
+            logging.info(message)
+
+
+        message = 'end retrieval of vessel type on all data files'
         logging.info(message)
         self.clear_dataframe_stage_1()
-        self.clear_dataframe_stage_2()
+        # self.clear_dataframe_stage_2()
         self.clear_vessel_type_retrieval_engine()
 
         
