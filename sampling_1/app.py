@@ -215,6 +215,14 @@ class model_engine():
         '''
         return list(set(mmsi_list_1) | set(mmsi_list_2))
 
+    def difference_mmsi_list(self, mmsi_list_data_files:List, mmsi_list_stored:List) -> List:
+        '''
+        Returns difference of two lists of mmsi numbers
+        '''
+        set_union = set(mmsi_list_data_files) | set(mmsi_list_stored) #removes duplicates
+        set_difference = set_union - set(mmsi_list_stored)
+        return list(set_difference)
+
     def load_aws_user_credentials(self):
         '''
         Loads credentials for AWS user
@@ -500,7 +508,7 @@ class model_engine():
         vessel_types_list = []
         total_mmsi_list = []  
         #retrieve mmsi from data files
-        for file_path in files_list[0:1]:
+        for file_path in files_list:
             message = f'begin mmsi retrieval on file {file_path.name}'
             logging.info(message)
             self.dataframe_stage_1 = pd.read_parquet(str(file_path), engine='pyarrow')
@@ -519,7 +527,7 @@ class model_engine():
         #correlate against stored mmsi list
         if self.dataframe_mmsi_vessel_type is not None:
             stored_mmsi_list = self.dataframe_mmsi_vessel_type[self.dataframe_mmsi_column_name].tolist()
-            filtered_mmsi_list = self.union_mmsi_list(total_mmsi_list, stored_mmsi_list)
+            filtered_mmsi_list = self.difference_mmsi_list(mmsi_list_data_files=total_mmsi_list, mmsi_list_stored=stored_mmsi_list)
             message = f'{len(filtered_mmsi_list)} mmsi numbers remaining'
             logging.info(message)
             save_mmsi_list = []
