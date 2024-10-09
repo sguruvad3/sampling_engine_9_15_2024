@@ -517,6 +517,8 @@ class model_engine():
         if self.dataframe_mmsi_vessel_type is not None:
             stored_mmsi_list = self.dataframe_mmsi_vessel_type[self.dataframe_mmsi_column_name].tolist()
             filtered_mmsi_list = self.union_mmsi_list(total_mmsi_list, stored_mmsi_list)
+            message = f'{len(filtered_mmsi_list)} mmsi numbers remaining'
+            logging.info(message)
             save_mmsi_list = []
             for index, mmsi in enumerate(filtered_mmsi_list):
                 #retrieve vessel types from API
@@ -533,6 +535,8 @@ class model_engine():
             logging.info(message)     
         #start from empty list of vessel types
         else:
+            message = f'{len(total_mmsi_list)} mmsi numbers remaining'
+            logging.info(message)
             save_mmsi_list = []
             for index, mmsi in enumerate(total_mmsi_list):
                 #retrieve vessel types from API
