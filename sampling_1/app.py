@@ -518,33 +518,34 @@ class model_engine():
         if self.dataframe_mmsi_vessel_type is not None:
             stored_mmsi_list = self.dataframe_mmsi_vessel_type[self.dataframe_mmsi_column_name].tolist()
             filtered_mmsi_list = self.union_mmsi_list(total_mmsi_list, stored_mmsi_list)
+            save_mmsi_list = []
             for index, mmsi in enumerate(filtered_mmsi_list):
                 #retrieve vessel types from API
                 vessel_type = self.vessel_type_retrieval_engine.get_vessel_type_single_mmsi(mmsi)
                 vessel_types_list.append(vessel_type)
-
-            dict_output = {self.dataframe_mmsi_column_name:filtered_mmsi_list ,self.dataframe_vessel_type_column_name:vessel_types_list}
-            self.dataframe_mmsi_vessel_type = pd.DataFrame.from_dict(dict_output)
-            self.save_vessel_info()
-            if (index+1) % 100 ==0 and (index+1) >= 100:
-                message = f'retrieved {(index+1)} vessel types'
-                logging.info(message) 
+                save_mmsi_list.append(mmsi)
+                if (index+1) % 10 ==0 and (index+1) >= 10:
+                    dict_output = {self.dataframe_mmsi_column_name:save_mmsi_list ,self.dataframe_vessel_type_column_name:vessel_types_list}
+                    self.dataframe_mmsi_vessel_type = pd.DataFrame.from_dict(dict_output)
+                    self.save_vessel_info()
+                    message = f'retrieved {(index+1)} vessel types'
+                    logging.info(message)
             message = f'retrieved {len(total_mmsi_list)} vessel types'
             logging.info(message)     
         #start from empty list of vessel types
         else:
+            save_mmsi_list = []
             for index, mmsi in enumerate(total_mmsi_list):
                 #retrieve vessel types from API
                 vessel_type = self.vessel_type_retrieval_engine.get_vessel_type_single_mmsi(mmsi)
                 vessel_types_list.append(vessel_type)
-            dict_output = {self.dataframe_mmsi_column_name:total_mmsi_list ,self.dataframe_vessel_type_column_name:vessel_types_list}
-            self.dataframe_mmsi_vessel_type = pd.DataFrame.from_dict(dict_output)
-            self.save_vessel_info()
-            if (index+1) % 100 ==0 and (index+1) >= 100:
-                message = f'retrieved {(index+1)} vessel types'
-                logging.info(message) 
-            message = f'retrieved {len(total_mmsi_list)} vessel types'
-            logging.info(message)
+                save_mmsi_list.append(mmsi)
+                if (index+1) % 10 ==0 and (index+1) >= 10:
+                    dict_output = {self.dataframe_mmsi_column_name:save_mmsi_list ,self.dataframe_vessel_type_column_name:vessel_types_list}
+                    self.dataframe_mmsi_vessel_type = pd.DataFrame.from_dict(dict_output)
+                    self.save_vessel_info()
+                    message = f'retrieved {(index+1)} vessel types'
+                    logging.info(message)
         message = 'end retrieval of vessel type on all data files'
         logging.info(message)
         self.clear_dataframe_stage_1()
