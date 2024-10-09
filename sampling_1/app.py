@@ -254,10 +254,9 @@ class model_engine():
         '''
         Saves vessel info to disk
         '''
-        if self.vessel_type_info_path.exists():
-            self.dataframe_mmsi_vessel_type = pd.to_parquet(str(self.vessel_type_info_path), engine='pyarrow')
-            message = 'saved vessel info to disk'
-            logging.info(message)
+        self.dataframe_mmsi_vessel_type.to_parquet(str(self.vessel_type_info_path), engine='pyarrow')
+        message = 'saved vessel info to disk'
+        logging.info(message)
         return
 
     def get_keyspace_credentials(self):
