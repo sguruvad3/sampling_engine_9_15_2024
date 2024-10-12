@@ -572,7 +572,7 @@ class model_engine():
                         logging.info(message)
                 else:
                     vessel_types_list.append(vessel_type)
-                    save_mmsi_list.append(mmsi)
+                    stored_mmsi_list.append(mmsi)
                     if (index+1) % self.vessel_type_write_threshold ==0 and (index+1) >= self.vessel_type_write_threshold:
                         dict_output = {self.dataframe_mmsi_column_name:stored_mmsi_list ,self.dataframe_vessel_type_column_name:vessel_types_list}
                         self.dataframe_mmsi_vessel_type = pd.DataFrame.from_dict(dict_output)
@@ -582,7 +582,7 @@ class model_engine():
                         logging.info(message)
                     #last chunk
                     elif (index+1) >= (len(filtered_mmsi_list) - self.vessel_type_write_threshold):
-                        dict_output = {self.dataframe_mmsi_column_name:save_mmsi_list ,self.dataframe_vessel_type_column_name:vessel_types_list}
+                        dict_output = {self.dataframe_mmsi_column_name:stored_mmsi_list, self.dataframe_vessel_type_column_name:vessel_types_list}
                         self.dataframe_mmsi_vessel_type = self.dataframe_mmsi_vessel_type.drop_duplicates(subset=['mmsi'], ignore_index=True)
                         self.dataframe_mmsi_vessel_type = pd.DataFrame.from_dict(dict_output)
                         self.save_vessel_info()
@@ -595,6 +595,7 @@ class model_engine():
             message = f'{len(total_mmsi_list)} mmsi numbers remaining'
             logging.info(message)
             save_mmsi_list = []
+            vessel_types_list = []
             unknown_vessel_type_mmsi_list = []
             for index, mmsi in enumerate(total_mmsi_list):
                 #retrieve vessel types from API
