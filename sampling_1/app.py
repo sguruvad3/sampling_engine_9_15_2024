@@ -553,9 +553,9 @@ class model_engine():
         if self.dataframe_mmsi_vessel_type is not None and self.dataframe_unknown_vessel_type is not None:
             stored_mmsi_list = self.dataframe_mmsi_vessel_type[self.dataframe_mmsi_column_name].tolist()
             vessel_types_list = self.dataframe_mmsi_vessel_type[self.dataframe_vessel_type_column_name].tolist()
-            unknown_vessels_mmsi_list = self.dataframe_unknown_vessel_type[self.dataframe_unknown_vessel_type_mmsi_column_name].tolist()
+            unknown_vessel_type_mmsi_list = self.dataframe_unknown_vessel_type[self.dataframe_unknown_vessel_type_mmsi_column_name].tolist()
             filtered_mmsi_list = self.difference_mmsi_list(mmsi_list_data_files=total_mmsi_list, mmsi_list_stored=stored_mmsi_list)
-            filtered_mmsi_list = self.difference_mmsi_list(mmsi_list_data_files=filtered_mmsi_list, mmsi_list_stored=unknown_vessels_mmsi_list)
+            filtered_mmsi_list = self.difference_mmsi_list(mmsi_list_data_files=filtered_mmsi_list, mmsi_list_stored=unknown_vessel_type_mmsi_list)
             message = f'{len(filtered_mmsi_list)} mmsi numbers remaining'
             logging.info(message)
             # save_mmsi_list = []
