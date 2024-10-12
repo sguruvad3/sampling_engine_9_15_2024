@@ -558,7 +558,6 @@ class model_engine():
             filtered_mmsi_list = self.difference_mmsi_list(mmsi_list_data_files=filtered_mmsi_list, mmsi_list_stored=unknown_vessel_type_mmsi_list)
             message = f'{len(filtered_mmsi_list)} mmsi numbers remaining'
             logging.info(message)
-            # save_mmsi_list = []
             for index, mmsi in enumerate(filtered_mmsi_list):
                 #retrieve vessel types from API
                 vessel_type = self.vessel_type_retrieval_engine.get_vessel_type_single_mmsi(mmsi)
@@ -566,6 +565,7 @@ class model_engine():
                     unknown_vessel_type_mmsi_list.append(mmsi)
                     dict_output = {self.dataframe_unknown_vessel_type_mmsi_column_name:unknown_vessel_type_mmsi_list}
                     self.dataframe_unknown_vessel_type = pd.DataFrame.from_dict(dict_output)
+                    self.dataframe_unknown_vessel_type = self.dataframe_unknown_vessel_type.drop_duplicates(subset=[self.dataframe_unknown_vessel_type_mmsi_column_name], ignore_index=True)
                     self.save_unknown_vessel_info()
                     if len(unknown_vessel_type_mmsi_list) % self.uknown_vessel_type_logging_threshold == 0 and len(unknown_vessel_type_mmsi_list) >= self.uknown_vessel_type_logging_threshold:
                         message = f'retrieved {len(unknown_vessel_type_mmsi_list)} unknown vessels'
@@ -576,14 +576,14 @@ class model_engine():
                     if (index+1) % self.vessel_type_write_threshold ==0 and (index+1) >= self.vessel_type_write_threshold:
                         dict_output = {self.dataframe_mmsi_column_name:stored_mmsi_list ,self.dataframe_vessel_type_column_name:vessel_types_list}
                         self.dataframe_mmsi_vessel_type = pd.DataFrame.from_dict(dict_output)
-                        self.dataframe_mmsi_vessel_type = self.dataframe_mmsi_vessel_type.drop_duplicates(subset=['mmsi'], ignore_index=True)
+                        self.dataframe_mmsi_vessel_type = self.dataframe_mmsi_vessel_type.drop_duplicates(subset=[self.dataframe_mmsi_column_name], ignore_index=True)
                         self.save_vessel_info()
                         message = f'retrieved {(index+1)} vessel types'
                         logging.info(message)
                     #last chunk
                     elif (index+1) >= (len(filtered_mmsi_list) - self.vessel_type_write_threshold):
                         dict_output = {self.dataframe_mmsi_column_name:stored_mmsi_list, self.dataframe_vessel_type_column_name:vessel_types_list}
-                        self.dataframe_mmsi_vessel_type = self.dataframe_mmsi_vessel_type.drop_duplicates(subset=['mmsi'], ignore_index=True)
+                        self.dataframe_mmsi_vessel_type = self.dataframe_mmsi_vessel_type.drop_duplicates(subset=[self.dataframe_mmsi_column_name], ignore_index=True)
                         self.dataframe_mmsi_vessel_type = pd.DataFrame.from_dict(dict_output)
                         self.save_vessel_info()
                         message = f'retrieved {(index+1)} vessel types'
@@ -604,7 +604,7 @@ class model_engine():
                     unknown_vessel_type_mmsi_list.append(mmsi)
                     dict_output = {self.dataframe_unknown_vessel_type_mmsi_column_name:unknown_vessel_type_mmsi_list}   
                     self.dataframe_unknown_vessel_type = pd.DataFrame.from_dict(dict_output)
-                    self.dataframe_unknown_vessel_type = self.dataframe_unknown_vessel_type.drop_duplicates(subset=['mmsi'], ignore_index=True)
+                    self.dataframe_unknown_vessel_type = self.dataframe_unknown_vessel_type.drop_duplicates(subset=[self.dataframe_unknown_vessel_type_mmsi_column_name], ignore_index=True)
                     self.save_unknown_vessel_info()
                     if len(unknown_vessel_type_mmsi_list) % self.uknown_vessel_type_logging_threshold == 0 and len(unknown_vessel_type_mmsi_list) >= self.uknown_vessel_type_logging_threshold:
                         message = f'retrieved {len(unknown_vessel_type_mmsi_list)} unknown vessels'
@@ -615,7 +615,7 @@ class model_engine():
                     if (index+1) % self.vessel_type_write_threshold ==0 and (index+1) >= self.vessel_type_write_threshold:
                         dict_output = {self.dataframe_mmsi_column_name:save_mmsi_list ,self.dataframe_vessel_type_column_name:vessel_types_list}
                         self.dataframe_mmsi_vessel_type = pd.DataFrame.from_dict(dict_output)
-                        self.dataframe_mmsi_vessel_type = self.dataframe_mmsi_vessel_type.drop_duplicates(subset=['mmsi'], ignore_index=True)
+                        self.dataframe_mmsi_vessel_type = self.dataframe_mmsi_vessel_type.drop_duplicates(subset=[self.dataframe_mmsi_column_name], ignore_index=True)
                         self.save_vessel_info()
                         message = f'retrieved {(index+1)} vessel types'
                         logging.info(message)
@@ -623,7 +623,7 @@ class model_engine():
                     elif (index+1) >= (len(total_mmsi_list) - self.vessel_type_write_threshold):
                         dict_output = {self.dataframe_mmsi_column_name:save_mmsi_list ,self.dataframe_vessel_type_column_name:vessel_types_list}
                         self.dataframe_mmsi_vessel_type = pd.DataFrame.from_dict(dict_output)
-                        self.dataframe_mmsi_vessel_type = self.dataframe_mmsi_vessel_type.drop_duplicates(subset=['mmsi'], ignore_index=True)
+                        self.dataframe_mmsi_vessel_type = self.dataframe_mmsi_vessel_type.drop_duplicates(subset=[self.dataframe_mmsi_column_name], ignore_index=True)
                         self.save_vessel_info()
                         message = f'retrieved {(index+1)} vessel types'
                         logging.info(message)
