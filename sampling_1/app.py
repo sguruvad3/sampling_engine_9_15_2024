@@ -157,6 +157,7 @@ class model_engine():
         self.dataframe_unknown_vessel_type_mmsi_column_name = 'mmsi'
 
         self.vessel_type_write_threshold = 1e2
+        self.uknown_vessel_type_logging_threshold = 1e1
 
         self.columns_list = [self.latitude_column_name, self.longitude_column_name, self.mmsi_column_name, self.timestamp_column_name]
         self.row_limit = 1e6
@@ -566,8 +567,9 @@ class model_engine():
                     dict_output = {self.dataframe_unknown_vessel_type_mmsi_column_name:unknown_vessel_type_mmsi_list}
                     self.dataframe_unknown_vessel_type = pd.DataFrame.from_dict(dict_output)
                     self.save_unknown_vessel_info()
-                    message = f'retrieved {len(unknown_vessel_type_mmsi_list)} unknown vessels'
-                    logging.info(message)
+                    if len(unknown_vessel_type_mmsi_list) % self.uknown_vessel_type_logging_threshold and len(unknown_vessel_type_mmsi_list) >= self.uknown_vessel_type_logging_threshold:
+                        message = f'retrieved {len(unknown_vessel_type_mmsi_list)} unknown vessels'
+                        logging.info(message)
                 else:
                     vessel_types_list.append(vessel_type)
                     save_mmsi_list.append(mmsi)
@@ -603,8 +605,9 @@ class model_engine():
                     self.dataframe_unknown_vessel_type = pd.DataFrame.from_dict(dict_output)
                     self.dataframe_unknown_vessel_type = self.dataframe_unknown_vessel_type.drop_duplicates(subset=['mmsi'], ignore_index=True)
                     self.save_unknown_vessel_info()
-                    message = f'retrieved {len(unknown_vessel_type_mmsi_list)} unknown vessels'
-                    logging.info(message)
+                    if len(unknown_vessel_type_mmsi_list) % self.uknown_vessel_type_logging_threshold and len(unknown_vessel_type_mmsi_list) >= self.uknown_vessel_type_logging_threshold:
+                        message = f'retrieved {len(unknown_vessel_type_mmsi_list)} unknown vessels'
+                        logging.info(message)
                 else: 
                     vessel_types_list.append(vessel_type)
                     save_mmsi_list.append(mmsi)
