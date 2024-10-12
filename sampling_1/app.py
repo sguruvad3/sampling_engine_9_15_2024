@@ -546,7 +546,7 @@ class model_engine():
         total_mmsi_list = dataframe_total_mmsi['mmsi'].tolist()
 
         self.load_vessel_info()
-        load_unknown_vessel_info()
+        self.load_unknown_vessel_info()
         self.setup_vessel_type_retrieval_engine()
         #correlate against stored mmsi list
         if self.dataframe_mmsi_vessel_type is not None and self.dataframe_unknown_vessel_type is not None:
@@ -561,7 +561,7 @@ class model_engine():
             for index, mmsi in enumerate(filtered_mmsi_list):
                 #retrieve vessel types from API
                 vessel_type = self.vessel_type_retrieval_engine.get_vessel_type_single_mmsi(mmsi)
-                if vessel_type is 'Unknown':
+                if vessel_type == 'Unknown':
                     unknown_vessel_type_mmsi_list.append(mmsi)
                     dict_output = {self.dataframe_unknown_vessel_type_mmsi_column_name:unknown_vessel_type_mmsi_list}
                     self.dataframe_unknown_vessel_type = pd.DataFrame.from_dict(dict_output)
@@ -597,7 +597,7 @@ class model_engine():
             for index, mmsi in enumerate(total_mmsi_list):
                 #retrieve vessel types from API
                 vessel_type = self.vessel_type_retrieval_engine.get_vessel_type_single_mmsi(mmsi)
-                if vessel_type is 'Unknown':
+                if vessel_type == 'Unknown':
                     unknown_vessel_type_mmsi_list.append(mmsi)
                     dict_output = {self.dataframe_unknown_vessel_type_mmsi_column_name:unknown_vessel_type_mmsi_list}   
                     self.dataframe_unknown_vessel_type = pd.DataFrame.from_dict(dict_output)
@@ -616,7 +616,7 @@ class model_engine():
                         message = f'retrieved {(index+1)} vessel types'
                         logging.info(message)
                     #last chunk
-                    elif (index+1) >= (len(filtered_mmsi_list) - self.vessel_type_write_threshold):
+                    elif (index+1) >= (len(total_mmsi_list) - self.vessel_type_write_threshold):
                         dict_output = {self.dataframe_mmsi_column_name:save_mmsi_list ,self.dataframe_vessel_type_column_name:vessel_types_list}
                         self.dataframe_mmsi_vessel_type = pd.DataFrame.from_dict(dict_output)
                         self.dataframe_mmsi_vessel_type = self.dataframe_mmsi_vessel_type.drop_duplicates(subset=['mmsi'], ignore_index=True)
