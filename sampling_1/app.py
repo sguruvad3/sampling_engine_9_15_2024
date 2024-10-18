@@ -80,6 +80,7 @@ class model_engine():
         self.iam_keyspace_role_credentials_filename = 'cassandra_iam_role_credentials.csv'
         self.iam_s3_role_credentials_filename = 's3_iam_role_credentials.csv'
         self.keyspace_endpoint_filename = 'keyspace_configuration.csv'
+        self.s3_configuration_filename = 's3_configuration.csv'
         self.cassandra_security_certificate_filename = 'sf-class2-root.crt'
         self.vessel_type_info_filename = 'vessel_type_info.parquet.gzip'
         self.unknown_vessel_type_filename = 'unknown_vessel_type.parquet.gzip'
@@ -91,6 +92,7 @@ class model_engine():
         self.iam_keyspace_role_credentials_path = self.credentials_dir / self.iam_keyspace_role_credentials_filename
         self.iam_s3_role_credentials_path = self.credentials_dir / self.iam_s3_role_credentials_filename
         self.keyspace_endpoint_path = self.credentials_dir / self.keyspace_endpoint_filename
+        self.s3_configuration_path = self.credentials_dir / self.s3_configuration_filename
         self.cassandra_security_certificate_path = self.credentials_dir / self.cassandra_security_certificate_filename
 
 
@@ -119,6 +121,7 @@ class model_engine():
         self.iam_keyspace_role_credentials_dataframe = None
         self.iam_s3_role_credentials_dataframe = None
         self.keyspace_endpoint_dataframe = None
+        self.s3_configuration_dataframe = None
 
         self.aws_user_access_key_id = None
         self.aws_user_secret_access_key = None
@@ -130,7 +133,9 @@ class model_engine():
         self.temporary_credentials_access_key_id = None
         self.temporary_credentials_secret_key = None
         self.temporary_credentials_session_token = None
-        self.iam_role_timeout = int(datetime_object.timedelta(hours=12).total_seconds()) #hours
+        self.iam_keyspace_role_timeout = int(datetime_object.timedelta(hours=12).total_seconds()) #hours
+
+        self.s3_bucket_name = None
 
         #Parameters for keyspace connection and database instance
         self.ssl_context = None
@@ -265,11 +270,20 @@ class model_engine():
         '''
         Loads endpoint for keyspace
         '''
-        self.keyspace_endpoint_dataframe = pd.read_csv(self.keyspace_endpoint_path)
+        self.keyspace_endpoint_dataframe = pd.read_csv(str(self.keyspace_endpoint_path))
         self.aws_default_region = self.keyspace_endpoint_dataframe['region'][0]
         self.keyspace_endpoint = self.keyspace_endpoint_dataframe['endpoint'][0]
         self.keyspace_name = self.keyspace_endpoint_dataframe['keyspace'][0]
         self.keyspace_table = self.keyspace_endpoint_dataframe['table'][0]
+        return
+    
+    def load_s3_configuration(self):
+        '''
+        Loads configuration parameters for uploading files to S3
+        '''
+        self.s3_configuration_dataframe = pd.read_csv(str(self.s3_configuration_path))
+        self.aws_default_region = self.s3_configuration_dataframe['region'][0]
+        self.s3_bucket_name = self.s3_configuration_dataframe['bucket'][0]
         return
 
     def load_vessel_info(self):
@@ -319,7 +333,7 @@ class model_engine():
         self.load_cassandra_iam_role_credentials()
 
         try:
-            response = self.aws_sts_client.assume_role(RoleArn=self.iam_keyspace_role_arn, RoleSessionName='ignored-by-weka-s3', DurationSeconds=self.iam_role_timeout)
+            response = self.aws_sts_client.assume_role(RoleArn=self.iam_keyspace_role_arn, RoleSessionName='ignored-by-weka-s3', DurationSeconds=self.iam_keyspace_role_timeout)
             self.temporary_credentials_access_key_id = response['Credentials']['AccessKeyId']
             self.temporary_credentials_secret_key = response['Credentials']['SecretAccessKey']
             self.temporary_credentials_session_token = response['Credentials']['SessionToken']
@@ -354,16 +368,26 @@ class model_engine():
         self.aws_sts_client = boto3.client('sts', aws_access_key_id=self.aws_user_access_key_id, aws_secret_access_key=self.aws_user_secret_access_key, region_name=self.aws_default_region)
 
         try:
-            response = self.aws_sts_client.assume_role(RoleArn=self.iam_s3_role_arn, RoleSessionName='ignored-by-weka-s3', DurationSeconds=self.iam_role_timeout)
+            response = self.aws_sts_client.assume_role(RoleArn=self.iam_s3_role_arn, RoleSessionName='ignored-by-weka-s3')
             self.temporary_credentials_access_key_id = response['Credentials']['AccessKeyId']
             self.temporary_credentials_secret_key = response['Credentials']['SecretAccessKey']
             self.temporary_credentials_session_token = response['Credentials']['SessionToken']
+            print(self.temporary_credentials_session_token)
         except ClientError as e:
             logging.error(e)
         
         self.clear_aws_user_credentials()
         self.close_aws_sts_boto3_session()
 
+        return
+
+    def setup_s3_connection(self):
+        '''
+        Loads connection parameters to interact with S3 bucket
+        '''
+        self.load_s3_configuration()
+        
+        
         return
 
     def setup_vessel_type_retrieval_engine(self):
@@ -858,7 +882,10 @@ if __name__ == "__main__":
     # engine_object.select_records()
 
     # engine_object.ETL_stage_1()
-    engine_object.get_vessel_type_all_files()
+    # engine_object.get_vessel_type_all_files()
+    engine_object.load_s3_iam_role_credentials()
+    engine_object.get_s3_credentials()
+
 
     # engine_object.delete_raw_data_files()
     # engine_object.delete_stage_1_data_files()
