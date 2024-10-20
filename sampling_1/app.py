@@ -193,6 +193,7 @@ class model_engine():
         self.aws_sts_client = None
         self.aws_keyspaces_session = None
         self.aws_s3_session = None
+        self.s3_resource_client = None
 
         #timer objects
         self.temporary_credentials_start_time_object = None
@@ -226,6 +227,7 @@ class model_engine():
         self.vessel_type_retrieval_engine = None
 
         #S3 file parameters
+        self.key_data_folder = 'data'
         self.key_prefix_year = None
         self.key_prefix_month = None
         self.key_prefix_day = None
@@ -393,8 +395,7 @@ class model_engine():
         '''
         self.load_s3_configuration()
         self.aws_s3_session = boto3.Session(aws_access_key_id=self.temporary_credentials_access_key_id, aws_secret_access_key=self.temporary_credentials_secret_key, aws_session_token=self.temporary_credentials_session_token, region_name=self.aws_default_region)
-
-        resource_client = self.aws_s3_session.resource(service_name='s3', region_name=self.aws_default_region, aws_access_key_id=self.temporary_credentials_access_key_id, aws_secret_access_key=self.temporary_credentials_secret_key, aws_session_token=self.temporary_credentials_session_token)
+        self.s3_resource_client = self.aws_s3_session.resource(service_name='s3', region_name=self.aws_default_region, aws_access_key_id=self.temporary_credentials_access_key_id, aws_secret_access_key=self.temporary_credentials_secret_key, aws_session_token=self.temporary_credentials_session_token)
 
         return
 
@@ -721,11 +722,12 @@ class model_engine():
         '''
         message = 'begin ETL stage 2 on all data files'
         logging.info(message)
+        self.load_vessel_info()
         files_list = list(self.stage_1_dir.glob('*')) 
         for file_path in files_list[0:1]:
             message = f'begin stage 2 of file {file_path.name}'
             logging.info(message)
-            self.dataframe_stage_1 = pd.read_parquet(str(file_path), engine='pyarrow')
+            self.dataframe_stage_2 = pd.read_parquet(str(file_path), engine='pyarrow')
             sample_timestamp = self.dataframe_stage_1[self.timestamp_column_name].iloc[0]
             year = sample_timestamp.year
             self.key_prefix_year = year
@@ -739,7 +741,7 @@ class model_engine():
             self.stage_2_formatted_filename = f'{year}{month}{day}{hour}{minute}{second}'
 
 
-            # sample_timestamp_dt = datetime.strptime(sample_timestamp, self.sampled_timestamp_format)
+            
             print(self.stage_2_formatted_filename)
 
 
@@ -748,7 +750,7 @@ class model_engine():
         
         message = 'end ETL stage 2 on all files'
         logging.info(message)
-        self.clear_dataframe_stage_1()
+        self.clear_dataframe_stage_2()
 
         return
 
@@ -780,6 +782,33 @@ class model_engine():
         #drop copied columns
         self.dataframe_raw = self.dataframe_raw.drop(columns=['time_copy', 'latitude_copy', 'longitude_copy'])
         self.dataframe_raw = self.dataframe_raw.reset_index(drop=True)
+        return
+
+    def join_stage_2_dataframe(self):
+        '''
+        Performs in-memory join of self.dataframe_stage_2 with vessel types
+        '''
+        input_mmsi_list = self.dataframe_stage_2[self.dataframe_mmsi_column_name].unique().tolist()
+        for input_mmsi in input_mmsi_list:
+            input_condition = self.dataframe_stage_2[self.dataframe_mmsi_column_name] == input_mmsi
+            input_index_selection = self.dataframe_stage_2.index[input_condition]
+
+        return
+
+    def upload_stage_2_file(self, input_path:Path):
+        '''
+        Uploads ETL_stage_2 file to S3
+        Source: self.stage_2_dir
+        Destination: s3://{self.s3_bucket_name}/{self.key_data_folder}/{self.key_prefix_year}/{self.key_prefix_month}/{self.key_prefix_day}/{self.stage_2_formatted_filename}.parquet.gzip
+        '''
+        output_s3_key = f'{self.key_data_folder}/{self.key_prefix_year}/{self.key_prefix_month}/{self.key_prefix_day}/{self.stage_2_formatted_filename}.parquet.gzip'
+        try:
+            self.s3_resource_client.upload_file(str(input_path), self.s3_bucket_name, output_s3_key)
+            message = f'uploaded file to S3: {self.stage_2_formatted_filename}.parquet.gzip'
+            logging.info(message)
+        except:
+            message = f'failed to upload file to S3: {self.stage_2_formatted_filename}.parquet.gzip'
+            logging.info(message)
         return
 
     def reset_raw_data_lists(self):
@@ -897,6 +926,13 @@ class model_engine():
         Clears self.vessel_type_retrieval_engine from memory
         '''
         self.vessel_type_retrieval_engine = None
+        return
+
+    def clear_vessel_type_info_dataframe(self):
+        '''
+        Deletes self.dataframe_mmsi_vessel_type from memory
+        '''
+        self.dataframe_mmsi_vessel_type = None
         return
 
     def delete_raw_data_files(self):
