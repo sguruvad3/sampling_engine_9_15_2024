@@ -807,13 +807,10 @@ class model_engine():
             if len(vessel_info_index_selection) != 0:
                 vessel_info_match_index = vessel_info_index_selection[0]
                 vessel_type = self.dataframe_mmsi_vessel_type[self.dataframe_vessel_type_column_name].iloc[vessel_info_match_index]
-                # self.dataframe_stage_2[self.dataframe_stage_2_vessel_type_column_name].iloc[input_index_selection] = vessel_type
                 self.dataframe_stage_2.loc[input_index_selection, self.dataframe_stage_2_vessel_type_column_name] = vessel_type
             else:
                 pass
         self.dataframe_stage_2 = self.dataframe_stage_2.dropna(subset=[self.dataframe_stage_2_vessel_type_column_name], ignore_index=True)
-        print(self.dataframe_stage_2.head())
-
         return
 
     def upload_stage_2_file(self, input_path:Path):
@@ -830,6 +827,7 @@ class model_engine():
         except:
             message = f'failed to upload file to S3: {self.stage_2_formatted_filename}.parquet.gzip'
             logging.info(message)
+            logging.exception('')
         return
 
     def reset_raw_data_lists(self):
@@ -996,14 +994,14 @@ if __name__ == "__main__":
     # engine_object.setup_keyspace_connection()
     # engine_object.select_records()
 
-    engine_object.ETL_stage_1()
+    # engine_object.ETL_stage_1()
     # engine_object.get_vessel_type_all_files()
 
     # engine_object.load_s3_iam_role_credentials()
     # engine_object.get_s3_credentials()
     # engine_object.setup_s3_connection()
 
-    # engine_object.ETL_stage_2()
+    engine_object.ETL_stage_2()
 
 
     # engine_object.delete_raw_data_files()
