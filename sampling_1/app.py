@@ -717,12 +717,20 @@ class model_engine():
         message = 'begin ETL stage 2 on all data files'
         logging.info(message)
         files_list = list(self.stage_1_dir.glob('*')) 
-        for file_path in files_list:
+        for file_path in files_list[0:1]:
             message = f'begin stage 2 of file {file_path.name}'
             logging.info(message)
             self.dataframe_stage_1 = pd.read_parquet(str(file_path), engine='pyarrow')
-            sample_timestamp = self.dataframe_stage_1[self.timestamp_column_name][0]
-            
+            sample_timestamp = self.dataframe_stage_1[self.timestamp_column_name].iloc[0]
+            year = sample_timestamp.year
+            month = sample_timestamp.month
+            day = sample_timestamp.day
+
+            self.stage_2_formatted_filename = f''
+
+            # sample_timestamp_dt = datetime.strptime(sample_timestamp, self.sampled_timestamp_format)
+            print(self.stage_2_formatted_filename)
+
 
             message = f'end stage 2 of file {file_path.name}'
             logging.info(message)
@@ -922,9 +930,12 @@ if __name__ == "__main__":
 
     # engine_object.ETL_stage_1()
     # engine_object.get_vessel_type_all_files()
-    engine_object.load_s3_iam_role_credentials()
-    engine_object.get_s3_credentials()
-    engine_object.setup_s3_connection()
+
+    # engine_object.load_s3_iam_role_credentials()
+    # engine_object.get_s3_credentials()
+    # engine_object.setup_s3_connection()
+
+    engine_object.ETL_stage_2()
 
 
     # engine_object.delete_raw_data_files()
