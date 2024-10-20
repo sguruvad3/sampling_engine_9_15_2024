@@ -227,7 +227,7 @@ class model_engine():
         self.vessel_type_retrieval_engine = None
 
         #self.dataframe_stage_2 parameters
-        self.self.dataframe_stage_2_vessel_type_column_name = 'vessel_type'
+        self.dataframe_stage_2_vessel_type_column_name = 'vessel_type'
 
         #S3 file parameters
         self.key_data_folder = 'data'
@@ -731,7 +731,7 @@ class model_engine():
             message = f'begin stage 2 of file {file_path.name}'
             logging.info(message)
             self.dataframe_stage_2 = pd.read_parquet(str(file_path), engine='pyarrow')
-            sample_timestamp = self.dataframe_stage_1[self.timestamp_column_name].iloc[0]
+            sample_timestamp = self.dataframe_stage_2[self.timestamp_column_name].iloc[0]
             year = sample_timestamp.year
             self.key_prefix_year = year
             month = str(sample_timestamp.month).zfill(2)
@@ -743,9 +743,9 @@ class model_engine():
             second = str(sample_timestamp.second).zfill(2)
             self.stage_2_formatted_filename = f'{year}{month}{day}{hour}{minute}{second}'
 
-
+            self.join_stage_2_dataframe()
             
-            print(self.stage_2_formatted_filename)
+            # print(self.stage_2_formatted_filename)
 
 
             message = f'end stage 2 of file {file_path.name}'
@@ -791,7 +791,7 @@ class model_engine():
         '''
         Performs in-memory join of self.dataframe_stage_2 with vessel types
         '''
-        self.dataframe_stage_2[self.self.dataframe_stage_2_vessel_type_column_name] = float('nan')
+        self.dataframe_stage_2[self.dataframe_stage_2_vessel_type_column_name] = float('nan')
         input_mmsi_list = self.dataframe_stage_2[self.dataframe_mmsi_column_name].unique().tolist()
         for input_mmsi in input_mmsi_list:
             input_condition = self.dataframe_stage_2[self.dataframe_mmsi_column_name] == input_mmsi
@@ -800,13 +800,12 @@ class model_engine():
             vessel_info_index_selection = vessel_info_condition.index[vessel_info_condition]
             if len(vessel_info_index_selection) != 0:
                 vessel_info_match_index = vessel_info_index_selection[0]
-                vessel_type = vessel_info_condition[self.dataframe_vessel_type_column_name].iloc[vessel_info_match_index]
-                self.dataframe_stage_2[self.self.dataframe_stage_2_vessel_type_column_name].iloc[input_index_selection] = vessel_type
+                vessel_type = self.dataframe_mmsi_vessel_type[self.dataframe_vessel_type_column_name].iloc[vessel_info_match_index]
+                self.dataframe_stage_2[self.dataframe_stage_2_vessel_type_column_name].iloc[input_index_selection] = vessel_type
             else:
                 pass
         self.dataframe_stage_2 = self.dataframe_stage_2.dropna(subset=[self.self.dataframe_stage_2_vessel_type_column_name], ignore_index=True)
         print(self.dataframe_stage_2.head())
-
 
         return
 
