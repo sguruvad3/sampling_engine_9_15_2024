@@ -225,6 +225,11 @@ class model_engine():
         #mmsi retrieval
         self.vessel_type_retrieval_engine = None
 
+        #S3 file parameters
+        self.key_prefix_year = None
+        self.key_prefix_month = None
+        self.key_prefix_day = None
+
         logging.basicConfig(filename=str(self.log_path), format="{asctime} - {levelname} - {message}", style="{", datefmt="%Y-%m-%d %H:%M", level=logging.INFO, filemode='w')
 
         return
@@ -723,10 +728,16 @@ class model_engine():
             self.dataframe_stage_1 = pd.read_parquet(str(file_path), engine='pyarrow')
             sample_timestamp = self.dataframe_stage_1[self.timestamp_column_name].iloc[0]
             year = sample_timestamp.year
-            month = sample_timestamp.month
-            day = sample_timestamp.day
+            self.key_prefix_year = year
+            month = str(sample_timestamp.month).zfill(2)
+            self.key_prefix_month = month
+            day = str(sample_timestamp.day).zfill(2)
+            self.key_prefix_day = day
+            hour = str(sample_timestamp.hour).zfill(2)
+            minute = str(sample_timestamp.minute).zfill(2)
+            second = str(sample_timestamp.second).zfill(2)
+            self.stage_2_formatted_filename = f'{year}{month}{day}{hour}{minute}{second}'
 
-            self.stage_2_formatted_filename = f''
 
             # sample_timestamp_dt = datetime.strptime(sample_timestamp, self.sampled_timestamp_format)
             print(self.stage_2_formatted_filename)
