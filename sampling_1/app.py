@@ -111,6 +111,7 @@ class model_engine():
 
         self.stage_2_dir = self.data_dir / self.stage_2_folder
         self.stage_2_dir.mkdir(parents=True, exist_ok=True)
+        self.stage_2_formatted_filename = None
 
         self.log_dir = self.config_dir / self.log_folder
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -191,6 +192,7 @@ class model_engine():
         #boto3 objects
         self.aws_sts_client = None
         self.aws_keyspaces_session = None
+        self.aws_s3_session = None
 
         #timer objects
         self.temporary_credentials_start_time_object = None
@@ -372,7 +374,6 @@ class model_engine():
             self.temporary_credentials_access_key_id = response['Credentials']['AccessKeyId']
             self.temporary_credentials_secret_key = response['Credentials']['SecretAccessKey']
             self.temporary_credentials_session_token = response['Credentials']['SessionToken']
-            print(self.temporary_credentials_session_token)
         except ClientError as e:
             logging.error(e)
         
@@ -386,8 +387,10 @@ class model_engine():
         Loads connection parameters to interact with S3 bucket
         '''
         self.load_s3_configuration()
-        
-        
+        self.aws_s3_session = boto3.Session(aws_access_key_id=self.temporary_credentials_access_key_id, aws_secret_access_key=self.temporary_credentials_secret_key, aws_session_token=self.temporary_credentials_session_token, region_name=self.aws_default_region)
+
+        resource_client = self.aws_s3_session.resource(service_name='s3', region_name=self.aws_default_region, aws_access_key_id=self.temporary_credentials_access_key_id, aws_secret_access_key=self.temporary_credentials_secret_key, aws_session_token=self.temporary_credentials_session_token)
+
         return
 
     def setup_vessel_type_retrieval_engine(self):
@@ -534,6 +537,17 @@ class model_engine():
             self.dataframe_stage_1.to_parquet(str(out_path), engine='pyarrow', compression='gzip')
         return
 
+    def write_stage_2_data_file(self):
+        '''
+        Writes stage 2 data to file
+        Output: self.stage_2_dir
+        '''
+        filename = self.stage_2_formatted_filename + '.parquet.gzip'
+        out_path = self.stage_2_dir / filename
+        if not self.dataframe_stage_2.empty:
+            self.dataframe_stage_2.to_parquet(str(out_path), engine='pyarrow', compression='gzip')
+        return
+    
     def ETL_stage_1(self):
         '''
         Coerce data to self.raw_data_schema
@@ -692,6 +706,31 @@ class model_engine():
         self.clear_dataframe_stage_1()
         # self.clear_dataframe_stage_2()
         self.clear_vessel_type_retrieval_engine()
+        return
+
+    def ETL_stage_2(self):
+        '''
+        Perform join operation on AIS data with vesse types
+        Source: self.stage_1_dir
+        Destination: self.stage_2_dir
+        '''
+        message = 'begin ETL stage 2 on all data files'
+        logging.info(message)
+        files_list = list(self.stage_1_dir.glob('*')) 
+        for file_path in files_list:
+            message = f'begin stage 2 of file {file_path.name}'
+            logging.info(message)
+            self.dataframe_stage_1 = pd.read_parquet(str(file_path), engine='pyarrow')
+            sample_timestamp = self.dataframe_stage_1[self.timestamp_column_name][0]
+            
+
+            message = f'end stage 2 of file {file_path.name}'
+            logging.info(message)
+        
+        message = 'end ETL stage 2 on all files'
+        logging.info(message)
+        self.clear_dataframe_stage_1()
+
         return
 
     def add_secondary_columns(self):
@@ -885,6 +924,7 @@ if __name__ == "__main__":
     # engine_object.get_vessel_type_all_files()
     engine_object.load_s3_iam_role_credentials()
     engine_object.get_s3_credentials()
+    engine_object.setup_s3_connection()
 
 
     # engine_object.delete_raw_data_files()
