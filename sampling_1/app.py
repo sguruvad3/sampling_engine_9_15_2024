@@ -539,23 +539,25 @@ class model_engine():
         '''
         Writes stage 1 data to file
         Output: self.stage_1_dir
+        Returns Path of written file
         '''
         filename = self.stage_1_formatted_filename + '.parquet.gzip'
         out_path = self.stage_1_dir / filename
         if not self.dataframe_stage_1.empty:
             self.dataframe_stage_1.to_parquet(str(out_path), engine='pyarrow', compression='gzip')
-        return
+        return out_path
 
     def write_stage_2_data_file(self):
         '''
         Writes stage 2 data to file
         Output: self.stage_2_dir
+        Returns Path of written file
         '''
         filename = self.stage_2_formatted_filename + '.parquet.gzip'
         out_path = self.stage_2_dir / filename
         if not self.dataframe_stage_2.empty:
             self.dataframe_stage_2.to_parquet(str(out_path), engine='pyarrow', compression='gzip')
-        return
+        return out_path
     
     def ETL_stage_1(self):
         '''
@@ -593,7 +595,8 @@ class model_engine():
             #     if mmsi_counter % 1e2 ==0 and mmsi_counter >=1e2:
             #         message = f'mmsi processed: {mmsi_counter}'
             #         logging.info(message)
-            #     mmsi_counter += 1     
+            #     mmsi_counter += 1
+            self.dataframe_stage_1 = self.dataframe_stage_1.drop(columns=[self.delta_time_column_name, self.delta_longitude_column_name, self.delta_latitude_column_name])     
             self.write_stage_1_data_file()
             message = f'end stage 1 of file {file_path.name}'
             logging.info(message)
@@ -742,8 +745,10 @@ class model_engine():
             minute = str(sample_timestamp.minute).zfill(2)
             second = str(sample_timestamp.second).zfill(2)
             self.stage_2_formatted_filename = f'{year}{month}{day}{hour}{minute}{second}'
-
             self.join_stage_2_dataframe()
+            out_path = self.write_stage_2_data_file()
+            self.upload_stage_2_file(out_path)
+
             
             # print(self.stage_2_formatted_filename)
 
@@ -792,6 +797,7 @@ class model_engine():
         Performs in-memory join of self.dataframe_stage_2 with vessel types
         '''
         self.dataframe_stage_2[self.dataframe_stage_2_vessel_type_column_name] = float('nan')
+        self.dataframe_stage_2[self.dataframe_stage_2_vessel_type_column_name] = self.dataframe_stage_2[self.dataframe_stage_2_vessel_type_column_name].astype(str)
         input_mmsi_list = self.dataframe_stage_2[self.dataframe_mmsi_column_name].unique().tolist()
         for input_mmsi in input_mmsi_list:
             input_condition = self.dataframe_stage_2[self.dataframe_mmsi_column_name] == input_mmsi
@@ -801,10 +807,11 @@ class model_engine():
             if len(vessel_info_index_selection) != 0:
                 vessel_info_match_index = vessel_info_index_selection[0]
                 vessel_type = self.dataframe_mmsi_vessel_type[self.dataframe_vessel_type_column_name].iloc[vessel_info_match_index]
-                self.dataframe_stage_2[self.dataframe_stage_2_vessel_type_column_name].iloc[input_index_selection] = vessel_type
+                # self.dataframe_stage_2[self.dataframe_stage_2_vessel_type_column_name].iloc[input_index_selection] = vessel_type
+                self.dataframe_stage_2.loc[input_index_selection, self.dataframe_stage_2_vessel_type_column_name] = vessel_type
             else:
                 pass
-        self.dataframe_stage_2 = self.dataframe_stage_2.dropna(subset=[self.self.dataframe_stage_2_vessel_type_column_name], ignore_index=True)
+        self.dataframe_stage_2 = self.dataframe_stage_2.dropna(subset=[self.dataframe_stage_2_vessel_type_column_name], ignore_index=True)
         print(self.dataframe_stage_2.head())
 
         return
@@ -989,14 +996,14 @@ if __name__ == "__main__":
     # engine_object.setup_keyspace_connection()
     # engine_object.select_records()
 
-    # engine_object.ETL_stage_1()
+    engine_object.ETL_stage_1()
     # engine_object.get_vessel_type_all_files()
 
     # engine_object.load_s3_iam_role_credentials()
     # engine_object.get_s3_credentials()
     # engine_object.setup_s3_connection()
 
-    engine_object.ETL_stage_2()
+    # engine_object.ETL_stage_2()
 
 
     # engine_object.delete_raw_data_files()
