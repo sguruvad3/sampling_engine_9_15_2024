@@ -726,6 +726,9 @@ class model_engine():
         Source: self.stage_1_dir
         Destination: self.stage_2_dir
         '''
+        self.load_s3_iam_role_credentials()
+        self.get_s3_credentials()
+        self.setup_s3_connection()
         message = 'begin ETL stage 2 on all data files'
         logging.info(message)
         self.load_vessel_info()
@@ -996,10 +999,6 @@ if __name__ == "__main__":
 
     # engine_object.ETL_stage_1()
     # engine_object.get_vessel_type_all_files()
-
-    # engine_object.load_s3_iam_role_credentials()
-    # engine_object.get_s3_credentials()
-    # engine_object.setup_s3_connection()
 
     engine_object.ETL_stage_2()
 
