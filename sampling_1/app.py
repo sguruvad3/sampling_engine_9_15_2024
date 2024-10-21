@@ -733,7 +733,7 @@ class model_engine():
         logging.info(message)
         self.load_vessel_info()
         files_list = list(self.stage_1_dir.glob('*')) 
-        for file_path in files_list[0:1]:
+        for file_path in files_list:
             message = f'begin stage 2 of file {file_path.name}'
             logging.info(message)
             self.dataframe_stage_2 = pd.read_parquet(str(file_path), engine='pyarrow')
@@ -747,22 +747,16 @@ class model_engine():
             hour = str(sample_timestamp.hour).zfill(2)
             minute = str(sample_timestamp.minute).zfill(2)
             second = str(sample_timestamp.second).zfill(2)
-            self.stage_2_formatted_filename = f'{year}{month}{day}{hour}{minute}{second}'
+            # self.stage_2_formatted_filename = f'{year}{month}{day}{hour}{minute}{second}'
+            self.stage_2_formatted_filename = file_path.stem.split('.')[0]
             self.join_stage_2_dataframe()
             out_path = self.write_stage_2_data_file()
             self.upload_stage_2_file(out_path)
-
-            
-            # print(self.stage_2_formatted_filename)
-
-
             message = f'end stage 2 of file {file_path.name}'
             logging.info(message)
-        
         message = 'end ETL stage 2 on all files'
         logging.info(message)
         self.clear_dataframe_stage_2()
-
         return
 
     def add_secondary_columns(self):
