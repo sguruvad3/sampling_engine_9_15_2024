@@ -69,6 +69,7 @@ class model_engine():
         self.raw_data_folder = 'raw'
         self.stage_1_folder = 'stage_1'
         self.stage_2_folder = 'stage_2'
+        self.stage_3_folder = 'stage_3'
         self.log_folder = 'log'
         self.credentials_folder = 'credentials'
         self.vessel_info_folder = 'vessel_info'
@@ -112,6 +113,10 @@ class model_engine():
         self.stage_2_dir = self.data_dir / self.stage_2_folder
         self.stage_2_dir.mkdir(parents=True, exist_ok=True)
         self.stage_2_formatted_filename = None
+
+        self.stage_3_dir = self.data_dir / self.stage_3_folder
+        self.stage_3_dir.mkdir(parents=True, exist_ok=True)
+        self.stage_3_formatted_filename = None
 
         self.log_dir = self.config_dir / self.log_folder
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -159,10 +164,12 @@ class model_engine():
         self.month_column_name = 'month'
         self.day_column_name = 'day'
         self.hour_column_name = 'hour'
+        self.fishing_vessel_status_column_name = 'is_fishing'
 
         self.dataframe_raw = None
         self.dataframe_stage_1 = None
         self.dataframe_stage_2 = None
+        self.dataframe_stage_3 = None
         self.dataframe_mmsi_vessel_type = None
         self.dataframe_unknown_vessel_type = None
 
@@ -226,8 +233,9 @@ class model_engine():
         #mmsi retrieval
         self.vessel_type_retrieval_engine = None
 
-        #self.dataframe_stage_2 parameters
         self.dataframe_stage_2_vessel_type_column_name = 'vessel_type'
+        self.dataframe_stage_3_vessel_type_column_name = 'vessel_type'
+        self.dataframe_stage_3_fishing_vessel_type = 'FISHING'
 
         #S3 file parameters
         self.key_data_folder = 'data'
@@ -828,6 +836,27 @@ class model_engine():
             logging.exception('')
         return
 
+    def ETL_stage_3(self):
+        '''
+        Adds fishing status column to data files
+        Input: self.stage_2_dir
+        Output: self.stage_3_dir
+        '''
+        files_list = list(self.stage_2_dir.glob('*')) 
+        for file_path in files_list[0:1]:
+            message = f'begin stage 3 of file {file_path.name}'
+            logging.info(message)
+            self.dataframe_stage_3 = pd.read_parquet(file_path, engine='pyarrow')
+            # print(self.dataframe_stage_3[self.dataframe_stage_3_vessel_type_column_name].value_counts())
+
+            self.dataframe_stage_3[self.fishing_vessel_status_column_name] = self.dataframe_stage_3[self.dataframe_stage_3_vessel_type_column_name] == self.dataframe_stage_3_fishing_vessel_type
+
+            print(self.dataframe_stage_3[self.fishing_vessel_status_column_name].value_counts())
+
+
+
+        return
+
     def reset_raw_data_lists(self):
         '''
         Resets list objects to empty. Used for storing raw data
@@ -994,7 +1023,7 @@ if __name__ == "__main__":
     # engine_object.ETL_stage_1()
     # engine_object.get_vessel_type_all_files()
     # engine_object.ETL_stage_2()
-
+    engine_object.ETL_stage_3()
 
 
     # engine_object.delete_raw_data_files()

@@ -38,6 +38,8 @@ class model_engine():
         self.model_dir = self.config_dir / self.model_folder
         self.model_dir.mkdir(parents=True, exist_ok=True)
         self.model_path = self.model_dir / self.model_filename
+
+        self.stage_2_dir = self.data_dir / self.stage_2_folder
         
         self.log_dir = self.config_dir / self.log_folder
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -182,7 +184,18 @@ class model_engine():
         self.model_object = linear_model.SGDClassifier()
         return
     
+    def train_files(self):
+        '''
+        '''
+        input_list = list(self.stage_2_dir.glob('*'))
+        message = 'start training on all data files'
+        logging.info(message)
+        for input_file in input_list:
+            dataframe_1 = pd.read_parquet(input_file, engine='pyarrow')
+            
 
+        
+        return
 
     def clear_dataframe_stage_2(self):
         '''
