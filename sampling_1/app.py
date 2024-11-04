@@ -1,4 +1,3 @@
-# import asyncio
 import boto3
 from botocore.exceptions import ClientError
 import datetime as datetime_object
@@ -58,6 +57,7 @@ def format_date(timestamp_obj:datetime) -> str:
 
 class model_engine():
     '''
+    Performs retrieval from Keyspace database, retrieval of vessel types, join of data files with vessel type, and uploads to S3
     '''
     
     def __init__(self):
@@ -722,7 +722,8 @@ class model_engine():
 
     def ETL_stage_2(self):
         '''
-        Perform join operation on AIS data with vesse types
+        Perform join operation on AIS data with vessel types
+        Uploads output files to S3
         Source: self.stage_1_dir
         Destination: self.stage_2_dir
         '''
@@ -990,11 +991,10 @@ if __name__ == "__main__":
     # engine_object.get_keyspace_credentials()
     # engine_object.setup_keyspace_connection()
     # engine_object.select_records()
-
     # engine_object.ETL_stage_1()
     # engine_object.get_vessel_type_all_files()
+    # engine_object.ETL_stage_2()
 
-    engine_object.ETL_stage_2()
 
 
     # engine_object.delete_raw_data_files()
