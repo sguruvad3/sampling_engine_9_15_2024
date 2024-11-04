@@ -147,16 +147,32 @@ class model_engine():
 
     def load_model(self):
         '''
-
+        Loads model from disk
+        Input: self.model_path
+        Output: self.model_object
         '''
+        if self.model_path.exists():
+            self.model_object = joblib.load(self.model_path)
+            message = 'model loaded from disk'
+            logging.info(message)
+        else:
+            message = 'model failed to load from disk'
+            logging.info(message)
         return
     
     def save_model(self):
         '''
         Saves self.model_object to disk
+        Input: self.model_object
         Output: self.model_path
         '''
-        joblib.dump(self.model_object, self.model_path)
+        if self.model_object is not None:
+            joblib.dump(self.model_object, self.model_path)
+            message = 'model saved to disk'
+            logging.info(message)
+        else:
+            message = 'model failed to save to disk'
+            logging.info(message)
         return
 
     def initialize_model(self):
