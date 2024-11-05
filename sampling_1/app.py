@@ -857,7 +857,7 @@ class model_engine():
         files_list = list(self.stage_2_dir.glob('*')) 
         message = 'begin ETL stage 3 on all data files'
         logging.info(message)
-        for file_path in files_list[0:1]:
+        for file_path in files_list:
             message = f'begin stage 3 of file {file_path.name}'
             logging.info(message)
             self.dataframe_stage_3 = pd.read_parquet(file_path, engine='pyarrow')
@@ -866,7 +866,7 @@ class model_engine():
             self.write_stage_3_data_file()
             message = f'end stage 3 of file {file_path.name}'
             logging.info(message)
-        message = 'begin ETL stage 3 on all data files'
+        message = 'end ETL stage 3 on all data files'
         logging.info(message)
         return
 

@@ -64,12 +64,18 @@ class model_engine():
         self.s3_bucket_name = None
         self.dataframe_stage_2 = None
 
+        self.latitude_column_name = 'lat'
+        self.longitude_column_name = 'lon'
         self.dataframe_mmsi_column_name = 'mmsi'
+        self.timestamp_column_name = 'time'
+        self.epoch_time_column_name = 'epoch'
         self.dataframe_vessel_type_column_name = 'vessel_type'
+        self.fishing_vessel_status_column_name = 'is_fishing'
 
         self.columns_list = [self.latitude_column_name, self.longitude_column_name, self.mmsi_column_name, self.timestamp_column_name]
         self.chunksize = 1e6
         self.sampled_timestamp_format = '%Y-%m-%d %H:%M:%S'
+        self.epoch_0_dt = datetime.datetime(1970,1,1)
 
         #boto3 objects
         self.aws_sts_client = None
@@ -187,15 +193,66 @@ class model_engine():
     def train_files(self):
         '''
         '''
-        input_list = list(self.stage_2_dir.glob('*'))
+        input_list = list(self.stage_3_dir.glob('*'))
         message = 'start training on all data files'
         logging.info(message)
         for input_file in input_list:
             dataframe_1 = pd.read_parquet(input_file, engine='pyarrow')
-            
+            dataframe_1 = self.add_epoch_time_column(dataframe_1)
+            dataframe_1 = self.check_classes(dataframe_1)
+
+            latitude_list = dataframe_1[self.latitude_column_name].tolist()
+            longitude_list = dataframe_1[self.longitude_column_name].tolist()
+            time_list = df_1[self.epoch_time_column_name].tolist()
+            fishing_status_list = df_1[self.fishing_vessel_status_column_name].tolist()
+
+            latitude_array = np.asarray(latitude_list)
+            longitude_array = np.asarray(longitude_list)
+            time_array = np.asarray(time_list)
+            fishing_status_array = np.asarray(fishing_status_list)
+
+            latitude_list = None
+            longitude_list = None
+            time_list = None
+            fishing_status_list = None
 
         
         return
+
+    def add_epoch_time_column(self, df_input:pd.DataFrame) -> pd.DataFrame:
+        '''
+        Adds epoch time column to df_input
+        Returns df_input with appended column
+        '''
+        epoch_list = []
+        for idx_1 in df_input.index:
+            time_str = str(df_input[self.timestamp_column_name][idx_1])
+            time_dt = datetime.datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
+            epoch_seconds = (time_dt - self.epoch_0_dt).total_seconds()
+            epoch_list.append(epoch_seconds)
+        df_input[self.epoch_time_column_name] = epoch_list
+        return df_input
+
+    def check_classes(self, df_input:pd.DataFrame) -> pd.DataFrame:
+        '''
+        Checks if df_input contains only False or only True for fishing status column 
+        '''
+        df_input = df_input.reset_index()
+
+        condition_True = df_input[self.fishing_vessel_status_column_name] == True
+        idx_selection = df_input.index[condition_True]
+        df_selection_True = df_input.iloc[idx_selection]
+        
+        condition_False = df_input[self.fishing_vessel_status_column_name] == False
+        idx_selection = df_input.index[condition_False]
+        df_selection_False = df_input.iloc[idx_selection]
+        
+        if df_selection_True.shape[0] == df_input.shape[0]: #all True
+            df_input[self.fishing_vessel_status_column_name][:2] = False #set first 2 rows to False
+        if df_selection_False.shape[0] == df_input.shape[0]: #all False
+            df_input[self.fishing_vessel_status_column_name][:2] = True #set first 2 rows to True
+
+        return df_input
 
     def clear_dataframe_stage_2(self):
         '''
