@@ -566,7 +566,19 @@ class model_engine():
         if not self.dataframe_stage_2.empty:
             self.dataframe_stage_2.to_parquet(str(out_path), engine='pyarrow', compression='gzip')
         return out_path
-    
+
+    def write_stage_3_data_file(self):
+        '''
+        Writes stage 3 data to file
+        Output: self.stage_3_dir
+        Returns Path of written file
+        '''
+        filename = self.stage_3_formatted_filename + '.parquet.gzip'
+        out_path = self.stage_3_dir / filename
+        if not self.dataframe_stage_3.empty:
+            self.dataframe_stage_3.to_parquet(str(out_path), engine='pyarrow', compression='gzip')
+        return out_path
+
     def ETL_stage_1(self):
         '''
         Coerce data to self.raw_data_schema
@@ -841,20 +853,21 @@ class model_engine():
         Adds fishing status column to data files
         Input: self.stage_2_dir
         Output: self.stage_3_dir
-        '''
+        '''        
         files_list = list(self.stage_2_dir.glob('*')) 
+        message = 'begin ETL stage 3 on all data files'
+        logging.info(message)
         for file_path in files_list[0:1]:
             message = f'begin stage 3 of file {file_path.name}'
             logging.info(message)
             self.dataframe_stage_3 = pd.read_parquet(file_path, engine='pyarrow')
-            # print(self.dataframe_stage_3[self.dataframe_stage_3_vessel_type_column_name].value_counts())
-
             self.dataframe_stage_3[self.fishing_vessel_status_column_name] = self.dataframe_stage_3[self.dataframe_stage_3_vessel_type_column_name] == self.dataframe_stage_3_fishing_vessel_type
-
-            print(self.dataframe_stage_3[self.fishing_vessel_status_column_name].value_counts())
-
-
-
+            self.stage_3_formatted_filename = file_path.stem.split('.')[0]
+            self.write_stage_3_data_file()
+            message = f'end stage 3 of file {file_path.name}'
+            logging.info(message)
+        message = 'begin ETL stage 3 on all data files'
+        logging.info(message)
         return
 
     def reset_raw_data_lists(self):
