@@ -70,9 +70,13 @@ class model_engine():
         self.stage_1_folder = 'stage_1'
         self.stage_2_folder = 'stage_2'
         self.stage_3_folder = 'stage_3'
+        self.stage_4_folder = 'stage_4'
         self.log_folder = 'log'
         self.credentials_folder = 'credentials'
         self.vessel_info_folder = 'vessel_info'
+        self.grid_folder = 'grid'
+        self.grid_compressed_folder = 'compressed'
+        self.grid_extracted_folder = 'extracted'
 
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.config_dir.mkdir(parents=True, exist_ok=True)
@@ -96,7 +100,6 @@ class model_engine():
         self.s3_configuration_path = self.credentials_dir / self.s3_configuration_filename
         self.cassandra_security_certificate_path = self.credentials_dir / self.cassandra_security_certificate_filename
 
-
         self.vessel_type_info_dir = self.config_dir / self.vessel_info_folder
         self.vessel_type_info_dir.mkdir(parents=True, exist_ok=True)
         self.vessel_type_info_path = self.vessel_type_info_dir / self.vessel_type_info_filename
@@ -117,6 +120,12 @@ class model_engine():
         self.stage_3_dir = self.data_dir / self.stage_3_folder
         self.stage_3_dir.mkdir(parents=True, exist_ok=True)
         self.stage_3_formatted_filename = None
+
+        self.stage_4_dir = self.data_dir / self.stage_3_folder
+        self.stage_4_dir.mkdir(parents=True, exist_ok=True)
+        self.stage_4_formatted_filename = None
+
+        self.
 
         self.log_dir = self.config_dir / self.log_folder
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -220,7 +229,6 @@ class model_engine():
         self.delta_longitude_column_name = 'delta_lon'
         self.delta_latitude_column_name = 'delta_lat'
     
-
         self.raw_data_schema = pa.DataFrameSchema({ self.timestamp_column_name: Column('datetime64[ns]', nullable=False), 
                                                     self.mmsi_column_name: Column(str, Check.str_length(min_value=9, max_value=9), nullable=False), 
                                                     self.latitude_column_name: Column('float64', Check(lambda s: (s >= self.latitude_lower_limit) & (s <= self.latitude_upper_limit)), nullable=False), 
@@ -768,7 +776,6 @@ class model_engine():
             hour = str(sample_timestamp.hour).zfill(2)
             minute = str(sample_timestamp.minute).zfill(2)
             second = str(sample_timestamp.second).zfill(2)
-            # self.stage_2_formatted_filename = f'{year}{month}{day}{hour}{minute}{second}'
             self.stage_2_formatted_filename = file_path.stem.split('.')[0]
             self.join_stage_2_dataframe()
             out_path = self.write_stage_2_data_file()
