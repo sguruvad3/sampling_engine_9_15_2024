@@ -9,6 +9,7 @@ from cassandra.cluster import Cluster
 from cassandra.metadata import ColumnMetadata
 from cassandra.query import SimpleStatement
 from cassandra_sigv4.auth import SigV4AuthProvider
+import geopandas
 import json
 import logging
 import os
@@ -78,7 +79,8 @@ class model_engine():
         self.grid_folder = 'grid'
         self.grid_compressed_folder = 'compressed'
         self.grid_extracted_folder = 'extracted'
-        self.grid_shapefile_folder = 'water-polygons-split-4326'
+        self.grid_shapefile_folder = 'World_Seas_IHO_v3'
+        self.grid_processed_folder = 'processed'
 
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.config_dir.mkdir(parents=True, exist_ok=True)
@@ -91,8 +93,9 @@ class model_engine():
         self.cassandra_security_certificate_filename = 'sf-class2-root.crt'
         self.vessel_type_info_filename = 'vessel_type_info.parquet.gzip'
         self.unknown_vessel_type_filename = 'unknown_vessel_type.parquet.gzip'
-        self.grid_compressed_filename = 'water-polygons-split-4326.zip'
-        self.grid_extracted_filename = 'water-polygons-split-4326.shp'
+        self.grid_compressed_filename = 'World_Seas_IHO_v3.zip'
+        self.grid_extracted_filename = 'World_Seas_IHO_v3.shp'
+        self.grid_processed_filename = 'processed_grid.shp'
 
         self.credentials_dir = self.config_dir / self.credentials_folder
         self.credentials_dir.mkdir(parents=True, exist_ok=True)
@@ -115,7 +118,11 @@ class model_engine():
         self.grid_compressed_dir.mkdir(parents=True, exist_ok=True)
         self.grid_extracted_dir.mkdir(parents=True, exist_ok=True)
         self.grid_compressed_path = self.grid_compressed_dir / self.grid_compressed_filename
-        self.grid_extracted_path = self.grid_extracted_dir / self.grid_extracted_filename
+        self.grid_shapefile_dir = self.grid_extracted_dir / self.grid_shapefile_folder
+        self.grid_shapefile_path = self.grid_shapefile_dir / self.grid_extracted_filename
+        self.grid_processed_dir = self.grid_dir / self.grid_processed_folder
+        self.grid_processed_dir.mkdir(parents=True, exist_ok=True)
+        self.grid_processed_path = self.grid_processed_dir / self.grid_processed_filename
 
         self.raw_data_dir = self.data_dir / self.raw_data_folder
         self.raw_data_dir.mkdir(parents=True, exist_ok=True)
@@ -258,6 +265,7 @@ class model_engine():
 
         #grid parameters
         self.dataframe_grid = None
+        self.dataframe_processed_grid = None
 
         #S3 file parameters
         self.key_data_folder = 'data'
@@ -386,9 +394,45 @@ class model_engine():
         '''
         Loads grid file into memory
         '''
+        if self.grid_shapefile_path.exists():
+            self.dataframe_grid = geopandas.read_file(self.grid_shapefile_path)
+            message = 'loaded grid to memory'
+            logging.info(message)
+        else:
+            message = 'grid failed to load to memory. File not found'
+            logging.info(message)
+        return
 
-        message = 'loaded grid to memory'
+    def prepare_grid_file(self):
+        '''
+        Extracts grid from compressed format
+        Loads grid file to memory
+        Drops all columns except geometry
+        Writes grid dataframe to file
+        Clears grid dataframe from memory 
+        '''
+        self.extract_grid_file()
+        self.load_grid()
+        for column in self.dataframe_grid.columns:
+            if column != 'geometry':
+                self.dataframe_grid = self.dataframe_grid.drop(columns=[column])
+        self.dataframe_grid.to_file(self.grid_processed_path)
+        message = 'processed grid file'
         logging.info(message)
+        self.clear_grid_dataframe()
+        return
+
+    def load_processed_grid(self):
+        '''
+        Loads processed grid file to memory
+        '''
+        if self.grid_processed_path.exists():
+            self.dataframe_processed_grid = geopandas.read_file(self.grid_processed_path)
+            message = 'processed grid file loaded to memory'
+            logging.info(message)
+        else:
+            message = 'grid file failed to load to memory. File not found'
+            logging.info(message)
         return
 
     def get_keyspace_credentials(self):
@@ -1168,7 +1212,8 @@ if __name__ == "__main__":
     # engine_object.get_vessel_type_all_files()
     # engine_object.ETL_stage_2()
     # engine_object.ETL_stage_3()
-    engine_object.extract_grid_file()
+    # engine_object.extract_grid_file()
+    engine_object.prepare_grid_file()
 
 
     # engine_object.delete_raw_data_files()
