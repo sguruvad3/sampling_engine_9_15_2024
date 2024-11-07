@@ -125,8 +125,6 @@ class model_engine():
         self.stage_4_dir.mkdir(parents=True, exist_ok=True)
         self.stage_4_formatted_filename = None
 
-        self.
-
         self.log_dir = self.config_dir / self.log_folder
         self.log_dir.mkdir(parents=True, exist_ok=True)
         log_filename = f'{date.today()}.log'
@@ -179,6 +177,7 @@ class model_engine():
         self.dataframe_stage_1 = None
         self.dataframe_stage_2 = None
         self.dataframe_stage_3 = None
+        self.dataframe_stage_4 = None
         self.dataframe_mmsi_vessel_type = None
         self.dataframe_unknown_vessel_type = None
 
@@ -587,6 +586,18 @@ class model_engine():
             self.dataframe_stage_3.to_parquet(str(out_path), engine='pyarrow', compression='gzip')
         return out_path
 
+    def write_stage_4_data_file(self):
+        '''
+        Writes stage 4 data to file
+        Output: self.stage_4_dir
+        Returns Path of written file
+        '''
+        filename = self.stage_4_formatted_filename + '.parquet.gzip'
+        out_path = self.stage_4_dir / filename
+        if not self.dataframe_stage_4.empty:
+            self.dataframe_stage_4.to_parquet(str(out_path), engine='pyarrow', compression='gzip')
+        return out_path
+
     def ETL_stage_1(self):
         '''
         Coerce data to self.raw_data_schema
@@ -875,6 +886,36 @@ class model_engine():
             logging.info(message)
         message = 'end ETL stage 3 on all data files'
         logging.info(message)
+        self.clear_dataframe_stage_3()
+        return
+
+    def ETL_stage_4(self):
+        '''
+        Adds fishing status column to data files
+        Input: self.stage_3_dir
+        Output: self.stage_4_dir
+        '''        
+        files_list = list(self.stage_3_dir.glob('*')) 
+        message = 'begin ETL stage 4 on all data files'
+        logging.info(message)
+        for file_path in files_list:
+            message = f'begin stage 4 of file {file_path.name}'
+            logging.info(message)
+            self.dataframe_stage_4 = pd.read_parquet(file_path, engine='pyarrow')
+
+            #intersect operation
+
+
+            self.stage_4_formatted_filename = file_path.stem.split('.')[0]
+            self.write_stage_4_data_file()
+            message = f'end stage 4 of file {file_path.name}'
+            logging.info(message)
+        
+        message = 'end ETL stage 4 on all data files'
+        logging.info(message)
+        self.clear_dataframe_stage_4()
+
+
         return
 
     def reset_raw_data_lists(self):
@@ -964,6 +1005,20 @@ class model_engine():
         self.dataframe_stage_2 = None
         return
 
+    def clear_dataframe_stage_3(self):
+        '''
+        Clears self.dataframe_stage_3 from memory
+        '''
+        self.dataframe_stage_3 = None
+        return
+    
+    def clear_dataframe_stage_4(self):
+        '''
+        Clears self.dataframe_stage_4 from memory
+        '''
+        self.dataframe_stage_4 = None
+        return
+
     def clear_aws_user_credentials(self):
         '''
         Clears AWS user credentials from memory
@@ -1031,6 +1086,28 @@ class model_engine():
         for file in files_list:
             file.unlink()
         message = 'deleted stage 2 data files'
+        logging.info(message)
+        return
+
+    def delete_stage_3_data_files(self):
+        '''
+        Deletes stage 3 data files from disk
+        '''
+        files_list = list(self.stage_3_dir.glob('*'))
+        for file in files_list:
+            file.unlink()
+        message = 'deleted stage 3 data files'
+        logging.info(message)
+        return
+    
+    def delete_stage_4_data_files(self):
+        '''
+        Deletes stage 4 data files from disk
+        '''
+        files_list = list(self.stage_4_dir.glob('*'))
+        for file in files_list:
+            file.unlink()
+        message = 'deleted stage 4 data files'
         logging.info(message)
         return
 
