@@ -1167,7 +1167,8 @@ if __name__ == "__main__":
     # engine_object.ETL_stage_1()
     # engine_object.get_vessel_type_all_files()
     # engine_object.ETL_stage_2()
-    engine_object.ETL_stage_3()
+    # engine_object.ETL_stage_3()
+    engine_object.extract_grid_file()
 
 
     # engine_object.delete_raw_data_files()
