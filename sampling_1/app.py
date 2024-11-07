@@ -191,6 +191,7 @@ class model_engine():
         self.day_column_name = 'day'
         self.hour_column_name = 'hour'
         self.fishing_vessel_status_column_name = 'is_fishing'
+        self.polygon_column_name = 'polygon'
 
         self.dataframe_raw = None
         self.dataframe_stage_1 = None
@@ -979,6 +980,7 @@ class model_engine():
         Input: self.stage_3_dir
         Output: self.stage_4_dir
         '''        
+        self.load_processed_grid()
         files_list = list(self.stage_3_dir.glob('*')) 
         message = 'begin ETL stage 4 on all data files'
         logging.info(message)
@@ -986,8 +988,14 @@ class model_engine():
             message = f'begin stage 4 of file {file_path.name}'
             logging.info(message)
             self.dataframe_stage_4 = pd.read_parquet(file_path, engine='pyarrow')
-
+            # self.dataframe_stage_4[self.polygon_column_name] = float('nan')
+            geodataframe_1 = geopandas.GeoDataFrame(self.dataframe_stage_4, geometry=geopandas.points_from_xy(self.longitude_column_name, self.latitude_column_name), crs="EPSG:4326")
             #intersect operation
+            self.dataframe_processed_grid = self.dataframe_processed_grid.reset_index(drop=True)
+            for grid_index in self.dataframe_processed_grid.index:
+                grid_polygon = self.dataframe_processed_grid['geometry'][grid_index]
+                condition_1 = grid_polygon.contains(geodataframe_1['geometry'], align=False)
+                
 
 
             self.stage_4_formatted_filename = file_path.stem.split('.')[0]
@@ -1213,7 +1221,8 @@ if __name__ == "__main__":
     # engine_object.ETL_stage_2()
     # engine_object.ETL_stage_3()
     # engine_object.extract_grid_file()
-    engine_object.prepare_grid_file()
+    # engine_object.prepare_grid_file()
+    engine_object.load_processed_grid()
 
 
     # engine_object.delete_raw_data_files()
