@@ -20,6 +20,7 @@ import shutil
 from ssl import SSLContext, PROTOCOL_TLSv1_2 , CERT_REQUIRED
 from typing import List
 from vessel import vessel
+from zipfile import ZipFile
 
 def format_time(input_time:str) -> str:
     '''
@@ -281,6 +282,22 @@ class model_engine():
         set_union = set(mmsi_list_data_files) | set(mmsi_list_stored) #removes duplicates
         set_difference = set_union - set(mmsi_list_stored)
         return list(set_difference)
+
+    def extract_grid_file(self):
+        '''
+        Extracts compressed grid file
+        Input: self.grid_compressed_path
+        Output: self.grid_extracted_dir
+        '''
+        if self.grid_compressed_path.exists():
+            with ZipFile(self.grid_compressed_path, 'r') as f:
+                f.extractall(self.grid_extracted_dir)
+            message = 'extracted grid file'
+            logging.info(message)
+        else:
+            message = 'failed to extract grid file'
+            logging.info(message)
+        return
 
     def load_aws_user_credentials(self):
         '''
