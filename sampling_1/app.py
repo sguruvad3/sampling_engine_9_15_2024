@@ -77,6 +77,7 @@ class model_engine():
         self.grid_folder = 'grid'
         self.grid_compressed_folder = 'compressed'
         self.grid_extracted_folder = 'extracted'
+        self.grid_shapefile_folder = 'water-polygons-split-4326'
 
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.config_dir.mkdir(parents=True, exist_ok=True)
@@ -89,6 +90,8 @@ class model_engine():
         self.cassandra_security_certificate_filename = 'sf-class2-root.crt'
         self.vessel_type_info_filename = 'vessel_type_info.parquet.gzip'
         self.unknown_vessel_type_filename = 'unknown_vessel_type.parquet.gzip'
+        self.grid_compressed_filename = 'water-polygons-split-4326.zip'
+        self.grid_extracted_filename = 'water-polygons-split-4326.shp'
 
         self.credentials_dir = self.config_dir / self.credentials_folder
         self.credentials_dir.mkdir(parents=True, exist_ok=True)
@@ -104,6 +107,14 @@ class model_engine():
         self.vessel_type_info_dir.mkdir(parents=True, exist_ok=True)
         self.vessel_type_info_path = self.vessel_type_info_dir / self.vessel_type_info_filename
         self.unknown_vessel_type_path = self.vessel_type_info_dir / self.unknown_vessel_type_filename
+
+        self.grid_dir = self.config_dir / self.grid_folder
+        self.grid_compressed_dir = self.grid_dir / self.grid_compressed_folder
+        self.grid_extracted_dir = self.grid_dir / self.grid_extracted_folder
+        self.grid_compressed_dir.mkdir(parents=True, exist_ok=True)
+        self.grid_extracted_dir.mkdir(parents=True, exist_ok=True)
+        self.grid_compressed_path = self.grid_compressed_dir / self.grid_compressed_filename
+        self.grid_extracted_path = self.grid_extracted_dir / self.grid_extracted_filename
 
         self.raw_data_dir = self.data_dir / self.raw_data_folder
         self.raw_data_dir.mkdir(parents=True, exist_ok=True)
@@ -121,7 +132,7 @@ class model_engine():
         self.stage_3_dir.mkdir(parents=True, exist_ok=True)
         self.stage_3_formatted_filename = None
 
-        self.stage_4_dir = self.data_dir / self.stage_3_folder
+        self.stage_4_dir = self.data_dir / self.stage_4_folder
         self.stage_4_dir.mkdir(parents=True, exist_ok=True)
         self.stage_4_formatted_filename = None
 
@@ -244,6 +255,9 @@ class model_engine():
         self.dataframe_stage_3_vessel_type_column_name = 'vessel_type'
         self.dataframe_stage_3_fishing_vessel_type = 'FISHING'
 
+        #grid parameters
+        self.dataframe_grid = None
+
         #S3 file parameters
         self.key_data_folder = 'data'
         self.key_prefix_year = None
@@ -348,6 +362,15 @@ class model_engine():
         '''
         self.dataframe_unknown_vessel_type.to_parquet(str(self.unknown_vessel_type_path), engine='pyarrow')
         message = 'saved unknown vessels info to disk'
+        logging.info(message)
+        return
+
+    def load_grid(self):
+        '''
+        Loads grid file into memory
+        '''
+
+        message = 'loaded grid to memory'
         logging.info(message)
         return
 
@@ -982,6 +1005,13 @@ class model_engine():
         Instantiates empty dataframe for storing results in self.dataframe_sampled
         '''
         self.dataframe_sampled = pd.DataFrame(columns=self.columns_list)
+        return
+
+    def clear_grid_dataframe(self):
+        '''
+        Clears self.dataframe_grid from memory
+        '''
+        self.dataframe_grid = None
         return
 
     def clear_dataframe_raw(self):
